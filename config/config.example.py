@@ -1,0 +1,15 @@
+
+## 3. `requirements.txt`
+```text
+streamlit==1.28.0
+pytesseract==0.3.10
+opencv-python==4.8.0.76
+deepface==0.0.79
+fer==0.0.9
+geopy==2.3.0
+Pillow==10.0.0
+easyocr==1.7.0
+google-cloud-vision==3.3.0
+python-dotenv==1.0.0
+tensorflow==2.12.0
+numpy==1.24.3
