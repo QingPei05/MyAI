@@ -56,7 +56,7 @@ def process_image(file):
         
         col1, col2 = st.columns(2)
         with col1:
-            st.image(image, use_column_width=True)
+            st.image(image, use_container_width=True)
         
         with st.spinner('分析中...'):
             location = "示例地点: 北京天安门"  # 替换为实际检测代码
