@@ -1,67 +1,45 @@
-from deepface import DeepFace
-from fer import FER
 import cv2
 import numpy as np
-from typing import Dict, List
-from config.settings import Config
+from deepface import DeepFace
 
-class MultiModelEmotionAnalyzer:
+class EmotionDetector:
     def __init__(self):
-        self.face_detector = FER(mtcnn=True)
-        self.emotion_models = [
-            'DeepFace',
-            'Facenet',
-            'OpenFace'
-        ]
+        self.models = ["VGG-Face", "Facenet", "OpenFace"]
         
-    def analyze(self, image: np.ndarray, min_confidence: float = 0.7) -> Dict[str, float]:
-        """Ensemble emotion analysis with multiple models"""
-        # Face detection
-        faces = self._detect_faces(image)
-        if not faces:
-            return {"No faces detected": 1.0}
-        
-        # Multi-model analysis
-        results = {}
-        for face in faces:
-            roi = self._extract_face_roi(image, face['box'])
-            emotions = self._ensemble_analysis(roi)
-            
-            for emotion, score in emotions.items():
-                if score >= min_confidence:
-                    results[emotion] = results.get(emotion, 0) + score
-        
-        return self._normalize_results(results)
-
-    def _ensemble_analysis(self, face_roi: np.ndarray) -> Dict[str, float]:
-        """Combine predictions from multiple models"""
-        ensemble_results = {}
-        
-        # DeepFace analysis
+    def detect(self, image):
+        """实际情绪检测逻辑"""
         try:
-            df_analysis = DeepFace.analyze(
-                face_roi, 
-                actions=['emotion'],
-                detector_backend='mtcnn',
-                enforce_detection=False,
-                silent=True
-            )
-            if isinstance(df_analysis, list):
-                df_analysis = df_analysis[0]
-            for emotion, score in df_analysis['emotion'].items():
-                ensemble_results[emotion] = ensemble_results.get(emotion, 0) + score
-        except:
-            pass
+            # 1. 人脸检测
+            faces = self._detect_faces(image)
+            if not faces:
+                return {"error": "未检测到人脸"}
             
-        # FER analysis
-        fer_analysis = self.face_detector.detect_emotions(face_roi)
-        if fer_analysis:
-            for emotion, score in fer_analysis[0]['emotions'].items():
-                ensemble_results[emotion] = ensemble_results.get(emotion, 0) + score
-        
-        return ensemble_results
+            # 2. 多模型集成分析
+            results = {}
+            for face in faces:
+                analysis = DeepFace.analyze(
+                    face, 
+                    actions=['emotion'],
+                    detector_backend='mtcnn',
+                    models=self.models,
+                    enforce_detection=False
+                )
+                for model_result in analysis:
+                    for emotion, score in model_result['emotion'].items():
+                        results[emotion] = results.get(emotion, 0) + score
+            
+            # 3. 归一化结果
+            total = sum(results.values())
+            return {k: round(v/total, 3) for k, v in results.items()}
+            
+        except Exception as e:
+            return {"error": str(e)}
 
-    def _normalize_results(self, results: Dict[str, float]) -> Dict[str, float]:
-        """Convert scores to percentages"""
-        total = sum(results.values())
-        return {k: round(v/total, 3) for k, v in results.items()}
+    def _detect_faces(self, image):
+        """人脸区域提取"""
+        face_cascade = cv2.CascadeClassifier(
+            cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+        )
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+        return [image[y:y+h, x:x+w] for (x,y,w,h) in faces]
