@@ -2,77 +2,72 @@ import streamlit as st
 import cv2
 import numpy as np
 from PIL import Image
-from utils.location_utils import detect_location
-from utils.emotion_utils import detect_emotions
-from utils.video_processor import process_video
-import tempfile
-import os
-from config import config
+from utils.location_utils import EnhancedLocationDetector
+from utils.emotion_utils import MultiModelEmotionAnalyzer
+from utils.video_processor import VideoAnalyzer
+from config.settings import Config
 
-# App configuration
+# Initialize detectors
+location_detector = EnhancedLocationDetector()
+emotion_analyzer = MultiModelEmotionAnalyzer()
+video_processor = VideoAnalyzer(location_detector, emotion_analyzer)
+
 st.set_page_config(
-    page_title="Geo-Emotion Analyzer",
+    page_title="High-Accuracy Geo-Emotion Analysis",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Main UI
-st.title("🌍 Location and Emotion Detection")
-st.markdown("""
-Analyze images/videos to detect:
-- 📍 Location from text/landmarks
-- 😊 Facial emotions
-""")
-
-# File upload
-uploaded_file = st.file_uploader(
-    "Upload media (JPG/PNG/MP4)",
-    type=["jpg", "jpeg", "png", "mp4"]
-)
-
-if uploaded_file:
-    if uploaded_file.type.startswith('image'):
-        process_image(uploaded_file)
-    elif uploaded_file.type.startswith('video'):
-        process_video_file(uploaded_file)
+def main():
+    st.title("🌍 High-Precision Location & Emotion Detection")
+    
+    with st.sidebar:
+        st.header("Settings")
+        Config.USE_GOOGLE_VISION = st.checkbox("Use Google Vision API", True)
+        Config.MIN_CONFIDENCE = st.slider("Minimum Confidence", 0.1, 1.0, 0.7)
+    
+    uploaded_file = st.file_uploader(
+        "Upload Image/Video", 
+        type=["jpg", "jpeg", "png", "mp4"],
+        help="For best results, use clear images with visible text/landmarks"
+    )
+    
+    if uploaded_file:
+        if uploaded_file.type.startswith('image'):
+            process_image(uploaded_file)
+        else:
+            process_video(uploaded_file)
 
 def process_image(uploaded_file):
-    """Handle image processing"""
     image = Image.open(uploaded_file).convert('RGB')
     img_array = np.array(image)
     
-    col1, col2 = st.columns(2)
-    with col1:
-        st.image(image, use_column_width=True)
-    
-    with st.spinner('Analyzing...'):
-        location = detect_location(img_array, config.USE_GOOGLE_API)
-        emotions = detect_emotions(img_array)
-    
-    with col2:
-        show_results(location, emotions)
+    with st.spinner('Running high-accuracy analysis...'):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.image(image, caption="Original", use_column_width=True)
+        
+        with col2:
+            location = location_detector.detect(
+                img_array, 
+                use_google=Config.USE_GOOGLE_VISION
+            )
+            emotions = emotion_analyzer.analyze(
+                img_array, 
+                min_confidence=Config.MIN_CONFIDENCE
+            )
+            
+            st.subheader("Analysis Results")
+            st.success(f"📍 **Location**: {location}")
+            st.success(f"😊 **Emotions**: {emotions}")
 
-def process_video_file(uploaded_file):
-    """Handle video processing"""
-    st.warning("Video processing may take several minutes...")
-    with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp:
-        tmp.write(uploaded_file.read())
-        video_path = tmp.name
-    
-    results = process_video(video_path, config)
-    os.unlink(video_path)
-    
-    st.success("Analysis complete!")
-    st.dataframe(results)
-    st.line_chart(results['emotions'].value_counts())
+def process_video(uploaded_file):
+    with st.spinner('Processing video frames...'):
+        results = video_processor.analyze_video(uploaded_file)
+        
+        st.dataframe(results)
+        st.line_chart(results['emotion'].value_counts())
 
-def show_results(location, emotions):
-    """Display analysis results"""
-    st.subheader("Results")
-    st.markdown(f"""
-    ### 📍 Location
-    **{location if location else "No location detected"}**
-    
-    ### 😊 Emotions
-    {emotions if emotions else "No faces detected"}
-    """)
+if __name__ == "__main__":
+    main()
