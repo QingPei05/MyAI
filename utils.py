@@ -10,7 +10,7 @@ def detect_location(image):
     """
     # 假设使用 Google Vision API 进行地点检测
     # 你需要在 Google Cloud 上设置该 API 并获取 API 密钥
-    api_key = 'YOUR_GOOGLE_VISION_API_KEY'
+    api_key = AIzaSyBdEwSEP38eh55gtGhS5JkTmtR87K4-1ug
     url = f"https://vision.googleapis.com/v1/images:annotate?key={api_key}"
 
     # 将图像编码为 JPEG 格式并进行 API 调用
