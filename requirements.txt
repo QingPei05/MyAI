@@ -1,5 +1,5 @@
 streamlit==1.32.0
-opencv-python==4.9.0.80
+opencv-python-headless==4.9.0.80
 tensorflow==2.16.1
 pytesseract==0.3.10
 easyocr==1.7.1
