@@ -3,6 +3,17 @@ import cv2
 import numpy as np
 from utils import detect_location, detect_emotion
 
+from models.location_model import LocationModel
+from models.emotion_model import EmotionModel
+
+# 初始化模型
+location_model = LocationModel(api_key='YOUR_GOOGLE_VISION_API_KEY')
+emotion_model = EmotionModel()
+
+# 使用模型进行检测
+location = location_model.detect_location(img)  # img 是上传的图像
+emotions = emotion_model.detect_emotion(img)    # img 是上传的图像
+
 # Streamlit 应用标题
 st.title("AI Location and Emotion Detection")
 
