@@ -7,9 +7,6 @@ class LocationModel:
         self.url = f"https://vision.googleapis.com/v1/images:annotate?key={self.api_key}"
 
     def detect_location(self, image):
-        """
-        检测图片中的地点。
-        """
         # 将图像编码为 JPEG 格式并进行 API 调用
         _, encoded_image = cv2.imencode('.jpg', image)
         image_data = encoded_image.tobytes()
