@@ -19,14 +19,37 @@ if uploaded_file is not None:
         location = detect_location(img)  # 检测地点
         emotions = detect_emotion(img)    # 检测情感
 
+        # 显示结果
+        st.write(f"Location: {location}")
+        st.write(f"Emotion: {emotions}")
+
     elif uploaded_file.type == "video/mp4":
         video_file = uploaded_file.read()
-        # 视频处理逻辑
         st.video(video_file)
 
-        # 这里需要添加视频帧提取和处理逻辑
-        # 例如：使用 cv2.VideoCapture 来读取每一帧
+        # 视频处理逻辑
+        video_path = "temp_video.mp4"
+        with open(video_path, "wb") as f:
+            f.write(video_file)
 
-    # 显示结果
-    st.write(f"Location: {location}")
-    st.write(f"Emotion: {emotions}")
+        cap = cv2.VideoCapture(video_path)
+        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+        locations = []
+        emotions = []
+
+        for _ in range(min(frame_count, 10)):  # 只处理前10帧
+            ret, frame = cap.read()
+            if not ret:
+                break
+            
+            location = detect_location(frame)  # 检测地点
+            emotion = detect_emotion(frame)    # 检测情感
+
+            locations.append(location)
+            emotions.append(emotion)
+        
+        cap.release()
+
+        # 显示结果
+        st.write(f"Locations detected: {locations}")
+        st.write(f"Emotions detected: {emotions}")
