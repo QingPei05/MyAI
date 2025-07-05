@@ -1,5 +1,10 @@
 import streamlit as st
-import cv2
+try:
+    import cv2
+except ImportError:
+    import sys
+    !{sys.executable} -m pip install opencv-python-headless==4.9.0.80
+    import cv2
 import numpy as np
 from PIL import Image
 from utils.location_utils import EnhancedLocationDetector
