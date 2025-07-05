@@ -5,8 +5,7 @@ pytesseract==0.3.10
 easyocr==1.7.1
 geopy==2.4.1
 deepface==0.0.81
-google-cloud-vision==3.5.0
+python-dotenv==1.0.1
 numpy==1.26.4
 Pillow==10.2.0
-python-dotenv==1.0.1
 pandas==2.1.4
