@@ -1,6 +1,8 @@
-streamlit
-opencv-python
-tensorflow
-numpy
-pillow
-requests
+streamlit==1.22.0
+pytesseract==0.3.10
+opencv-python==4.7.0.72
+deepface==0.0.79
+geopy==2.3.0
+Pillow==9.5.0
+numpy==1.24.3
+python-dotenv==1.0.0
