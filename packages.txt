@@ -4,4 +4,3 @@ libxrender1
 libxext6
 tesseract-ocr
 ffmpeg
-libopencv-dev
