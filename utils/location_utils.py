@@ -1,82 +1,79 @@
-import cv2
 import pytesseract
 import easyocr
+import cv2
 import re
 import numpy as np
 from geopy.geocoders import Nominatim
-from typing import List, Optional, Tuple
+from google.cloud import vision
+from typing import List, Optional
+from config.settings import Config
 
-class LocationDetector:
+class EnhancedLocationDetector:
     def __init__(self):
-        """初始化多模态地点检测器"""
         self.ocr_reader = easyocr.Reader(['en', 'zh'])
-        self.geolocator = Nominatim(user_agent="geo-detection-v2")
-        self.min_confidence = 0.7
+        self.geolocator = Nominatim(user_agent="high-accuracy-geo-detector")
+        self.vision_client = None
+        
+        if Config.GOOGLE_CREDENTIALS:
+            self.vision_client = vision.ImageAnnotatorClient()
 
-    def detect(self, image: np.ndarray) -> str:
-        """
-        主检测方法
-        :param image: RGB格式的numpy数组
-        :return: 地点字符串
-        """
-        try:
-            # 预处理图像
-            processed_img = self._preprocess_image(image)
-            
-            # 多阶段检测
-            location = self._detect_by_text(processed_img) or \
-                      self._detect_by_landmark(image)
-            
-            return location or "地点无法识别"
+    def detect(self, image: np.ndarray, use_google: bool = True) -> str:
+        """Multi-modal location detection pipeline"""
+        # Step 1: Try GPS EXIF data first
+        gps_location = self._extract_gps(image)
+        if gps_location:
+            return gps_location
+        
+        # Step 2: Hybrid OCR (Tesseract + EasyOCR)
+        ocr_text = self._hybrid_ocr(image)
+        locations = self._extract_location_candidates(ocr_text)
+        
+        # Step 3: Google Vision Landmark Detection
+        if use_google and self.vision_client:
+            landmarks = self._google_landmark_detection(image)
+            locations.extend(landmarks)
+        
+        # Step 4: Validate and geocode
+        return self._resolve_location(locations[:3])  # Top 3 candidates
 
-        except Exception as e:
-            return f"检测错误: {str(e)}"
-
-    def _preprocess_image(self, image: np.ndarray) -> np.ndarray:
-        """图像增强处理"""
+    def _hybrid_ocr(self, image: np.ndarray) -> str:
+        """Combine Tesseract and EasyOCR for maximum text coverage"""
+        # Preprocess image
         gray = cv2.cvtColor(image, cv2.COLOR_RGB2GRAY)
         denoised = cv2.fastNlMeansDenoising(gray, h=30)
-        return cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
-
-    def _detect_by_text(self, image: np.ndarray) -> Optional[str]:
-        """通过OCR文本识别地点"""
-        # 多引擎OCR
-        custom_config = r'--oem 3 --psm 6 -l chi_sim+eng'
-        text = pytesseract.image_to_string(image, config=custom_config)
-        easy_results = self.ocr_reader.readtext(image, detail=0)
-        combined_text = text + " " + " ".join(easy_results)
         
-        # 提取地点候选
-        candidates = self._extract_location_candidates(combined_text)
-        return self._resolve_location(candidates[0]) if candidates else None
+        # Tesseract with custom config
+        custom_config = r'--oem 3 --psm 6'
+        text = pytesseract.image_to_string(denoised, config=custom_config)
+        
+        # EasyOCR for complex cases
+        easy_results = self.ocr_reader.readtext(denoised, detail=0)
+        text += " ".join(easy_results)
+        
+        return text
 
-    def _extract_location_candidates(self, text: str) -> List[str]:
-        """从文本提取可能的地点"""
-        patterns = [
-            r'[\u4e00-\u9fa5]{2,8}(?:市|区|县|镇|村|街道)',  # 中文地名
-            r'[A-Z][a-zA-Z\s]{3,}(?:City|Town|Village)',    # 英文地名
-            r'[A-Z]{2,}\s*\d{2,5}'                          # 道路编号
-        ]
-        candidates = []
-        for pattern in patterns:
-            candidates.extend(re.findall(pattern, text))
-        return list(set(candidates))
+    def _google_landmark_detection(self, image: np.ndarray) -> List[str]:
+        """Use Google Vision API for landmark recognition"""
+        _, encoded_img = cv2.imencode('.jpg', image)
+        content = encoded_img.tobytes()
+        image = vision.Image(content=content)
+        
+        response = self.vision_client.landmark_detection(image=image)
+        return [landmark.description for landmark in response.landmark_annotations]
 
-    def _detect_by_landmark(self, image: np.ndarray) -> Optional[str]:
-        """通过视觉地标识别"""
-        # 实际项目中应替换为您的视觉地标模型
-        # 这里使用简单的颜色特征作为示例
-        hsv = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
-        if np.mean(hsv[:,:,0]) > 100:  # 示例条件
-            return "疑似自然景观区域"
-        return None
-
-    def _resolve_location(self, candidate: str) -> str:
-        """地理编码解析"""
-        try:
-            location = self.geolocator.geocode(candidate, exactly_one=True, timeout=10)
-            if location:
-                return f"{location.address} (经度:{location.longitude:.4f}, 纬度:{location.latitude:.4f})"
-            return candidate
-        except:
-            return candidate
+    def _resolve_location(self, candidates: List[str]) -> str:
+        """Validate and format the best location"""
+        for loc in candidates:
+            try:
+                location = self.geolocator.geocode(
+                    loc, 
+                    exactly_one=True,
+                    timeout=10,
+                    language='en'
+                )
+                if location:
+                    address = location.raw['address']
+                    return f"{loc}, {address.get('city', '')}, {address.get('country', '')}"
+            except Exception:
+                continue
+        return "Location not recognized"
