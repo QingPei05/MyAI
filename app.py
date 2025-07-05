@@ -1,61 +1,34 @@
 import streamlit as st
-import cv2
+from PIL import Image
 import numpy as np
-from utils import detect_location, detect_emotion
-from models.location_model import LocationModel
-from models.emotion_model import EmotionModel
+from utils.location_detector import detect_location
+from utils.emotion_detector import detect_emotions
 
-# 初始化模型
-location_model = LocationModel(api_key='AIzaSyBdEwSEP38eh55gtGhS5JkTmtR87K4-1ug')
-emotion_model = EmotionModel()
+st.title("🌍 地点与情绪检测系统")
+st.write("上传照片或视频，系统将检测拍摄地点和人物情绪")
 
-# Streamlit 应用标题
-st.title("AI Location and Emotion Detection")
-
-# 用户上传文件
-uploaded_file = st.file_uploader("上传照片或视频...", type=["jpg", "jpeg", "png", "mp4"])
+uploaded_file = st.file_uploader("选择文件", type=["jpg", "jpeg", "png", "mp4"])
 
 if uploaded_file is not None:
-    # 处理图片或视频
-    if uploaded_file.type in ["image/jpeg", "image/png"]:
-        image = np.array(bytearray(uploaded_file.read()), dtype=np.uint8)
-        img = cv2.imdecode(image, cv2.IMREAD_COLOR)
-        st.image(img, caption='Uploaded Image', use_column_width=True)
-
-        location = location_model.detect_location(img)  # 检测地点
-        emotions = emotion_model.detect_emotion(img)    # 检测情感
-
-        # 显示结果
-        st.write(f"Location: {location}")
-        st.write(f"Emotion: {emotions}")
-
-    elif uploaded_file.type == "video/mp4":
-        video_file = uploaded_file.read()
-        st.video(video_file)
-
-        # 视频处理逻辑
-        video_path = "temp_video.mp4"
-        with open(video_path, "wb") as f:
-            f.write(video_file)
-
-        cap = cv2.VideoCapture(video_path)
-        frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-        locations = []
-        emotions = []
-
-        for _ in range(min(frame_count, 10)):  # 只处理前10帧
-            ret, frame = cap.read()
-            if not ret:
-                break
-            
-            location = detect_location(frame)  # 检测地点
-            emotion = detect_emotion(frame)    # 检测情感
-
-            locations.append(location)
-            emotions.append(emotion)
+    if uploaded_file.type.startswith('image'):
+        # 处理图片
+        image = Image.open(uploaded_file)
+        st.image(image, caption='上传的图片', use_column_width=True)
         
-        cap.release()
-
-        # 显示结果
-        st.write(f"Locations detected: {locations}")
-        st.write(f"Emotions detected: {emotions}")
+        # 转换为numpy数组供模型处理
+        img_array = np.array(image)
+        
+        with st.spinner('正在分析...'):
+            # 检测地点
+            location = detect_location(img_array)
+            # 检测情绪
+            emotions = detect_emotions(img_array)
+            
+        st.success("分析完成！")
+        st.subheader("结果:")
+        st.write(f"📍 **地点**: {location}")
+        st.write(f"😊 **情绪分析**: {emotions}")
+        
+    elif uploaded_file.type.startswith('video'):
+        # 处理视频（略复杂的实现）
+        st.warning("视频处理功能正在开发中...")
