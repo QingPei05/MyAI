@@ -1,7 +1,8 @@
 import cv2
 import numpy as np
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw, ImageFont  # 确保导入ImageDraw和ImageFont
+import os
 
 # 加载预训练模型
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -25,7 +26,7 @@ def detect_emotion(img):
         # 情绪判断逻辑
         emotion = "平静"  # 默认
         
-        # 愤怒判断（新增）
+        # 愤怒判断
         if len(eyes) >= 2:
             eye_centers = [y + ey + eh/2 for (ex,ey,ew,eh) in eyes[:2]]
             avg_eye_height = np.mean(eye_centers)
@@ -45,27 +46,72 @@ def detect_emotion(img):
     
     return emotions, faces
 
+def get_chinese_font(font_size=20):
+    """获取中文字体，支持多平台"""
+    try:
+        # 尝试几种常见的中文字体
+        font_paths = [
+            "simhei.ttf",  # Windows
+            "SimHei.ttf",  # Windows
+            "/System/Library/Fonts/STHeiti Medium.ttc",  # macOS
+            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",  # Linux
+            "NotoSansCJK-Regular.ttc"  # 通用
+        ]
+        
+        for font_path in font_paths:
+            try:
+                return ImageFont.truetype(font_path, font_size)
+            except:
+                continue
+        
+        # 如果都找不到，尝试使用系统默认字体（可能不支持中文）
+        return ImageFont.load_default()
+    except:
+        return ImageFont.load_default()
+
 def draw_detections(img, emotions, faces):
-    """高质量标注绘制（带序号和背景框）"""
+    """确保中文标签正确显示的绘制函数"""
     output_img = img.copy()
+    
+    # 颜色映射
+    color_map = {
+        "快乐": (0, 255, 0),     # 绿色
+        "平静": (255, 255, 0),   # 黄色
+        "悲伤": (0, 0, 255),     # 红色
+        "愤怒": (0, 165, 255)    # 橙色
+    }
+    
+    # 获取中文字体
+    font = get_chinese_font()
+    
     for i, ((x,y,w,h), emotion) in enumerate(zip(faces, emotions)):
-        # 颜色映射（新增愤怒的橙色）
-        color_map = {
-            "快乐": (0, 180, 0),    # 绿色
-            "平静": (210, 210, 0),  # 黄色
-            "悲伤": (0, 0, 180),    # 红色
-            "愤怒": (0, 100, 255)   # 橙色
-        }
-        color = color_map.get(emotion, (150,150,150))
+        color = color_map.get(emotion, (255, 255, 255))
         
-        # 带背景的文本标签
-        text = f"{i+1}:{emotion}"
-        (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
-        cv2.rectangle(output_img, (x, y-40), (x+text_w+10, y-10), color, -1)
-        cv2.putText(output_img, text, (x+5, y-20), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
+        # 将OpenCV图像转为PIL图像
+        pil_img = Image.fromarray(cv2.cvtColor(output_img, cv2.COLOR_BGR2RGB))
+        draw = ImageDraw.Draw(pil_img)
         
-        # 人脸框
+        # 绘制文本背景框
+        text = emotion  # 直接使用中文
+        text_width, text_height = draw.textsize(text, font=font)
+        draw.rectangle(
+            [(x, y - text_height - 10), (x + text_width + 10, y - 10)],
+            fill=color,
+            outline=color
+        )
+        
+        # 绘制中文文本
+        draw.text(
+            (x + 5, y - text_height - 5),
+            text,
+            font=font,
+            fill=(255, 255, 255)  # 白色文字
+        )
+        
+        # 转换回OpenCV格式
+        output_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
+        
+        # 绘制人脸框
         cv2.rectangle(output_img, (x,y), (x+w,y+h), color, 3)
     
     return output_img
@@ -86,24 +132,16 @@ def main():
             emotions, faces = detect_emotion(img)
             detected_img = draw_detections(img.copy(), emotions, faces)
             
-            # 使用两列布局（左侧结果，右侧图片）
+            # 使用两列布局
             col1, col2 = st.columns([1, 2])
             
             with col1:
                 st.subheader("检测结果")
                 if emotions:
-                    # 中文字典映射
-                    emotion_mapping = {
-                        "快乐": "开心",
-                        "平静": "平静",
-                        "悲伤": "伤心",
-                        "愤怒": "愤怒"
-                    }
-                    
                     emotion_count = {
-                        "开心": emotions.count("快乐"),
+                        "快乐": emotions.count("快乐"),
                         "平静": emotions.count("平静"),
-                        "伤心": emotions.count("悲伤"),
+                        "悲伤": emotions.count("悲伤"),
                         "愤怒": emotions.count("愤怒")
                     }
                     
@@ -116,26 +154,24 @@ def main():
                     st.markdown("---")
                     st.markdown("**检测原理**：")
                     st.write("""
-                    - 😊 开心: 检测到明显笑容
+                    - 😊 快乐: 检测到明显笑容
                     - 😠 愤怒: 眼睛睁大且位置偏高
                     - 😐 平静: 默认中性表情
-                    - 😢 伤心: 眼睛位置偏高
+                    - 😢 悲伤: 眼睛位置偏高
                     """)
                 else:
                     st.warning("未检测到人脸")
             
             with col2:
-                # 使用选项卡显示图片
                 tab1, tab2 = st.tabs(["原始图片", "分析结果"])
                 with tab1:
-                    st.image(image, use_container_width=True)
+                    st.image(image, use_column_width=True)
                 with tab2:
-                    st.image(detected_img, channels="BGR", use_container_width=True,
-                           caption=f"检测到 {len(faces)} 个人脸")  # 修改为只显示人脸数量
+                    st.image(detected_img, channels="BGR", use_column_width=True,
+                           caption=f"检测到 {len(faces)} 个人脸")
                 
         except Exception as e:
             st.error(f"处理错误: {str(e)}")
 
 if __name__ == "__main__":
     main()
-
