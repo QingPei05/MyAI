@@ -9,7 +9,7 @@ eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml
 smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
 
 def detect_emotion(img):
-    """使用OpenCV检测情绪（happy/neutral/sad）"""
+    """使用OpenCV检测情绪（快乐、平静、悲伤、愤怒）"""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
     
@@ -23,12 +23,23 @@ def detect_emotion(img):
         eyes = eye_cascade.detectMultiScale(roi_gray)
         
         # 情绪判断逻辑
-        emotion = "neutral"  # 默认
+        emotion = "平静"  # 默认
+        
+        # 愤怒判断（新增）
+        if len(eyes) >= 2:
+            eye_centers = [y + ey + eh/2 for (ex,ey,ew,eh) in eyes[:2]]
+            avg_eye_height = np.mean(eye_centers)
+            eye_sizes = [eh for (ex,ey,ew,eh) in eyes[:2]]
+            avg_eye_size = np.mean(eye_sizes)
+            
+            if avg_eye_size > h/5 and avg_eye_height < h/2.5:
+                emotion = "愤怒"
+            elif avg_eye_height < h/3:
+                emotion = "悲伤"
+        
+        # 快乐判断（优先判断）
         if len(smiles) > 0:
-            emotion = "happy"
-        elif len(eyes) > 0:
-            if eyes[0][1] < h/3:  # 眼睛位置偏高
-                emotion = "sad"
+            emotion = "快乐"
         
         emotions.append(emotion)
     
@@ -38,11 +49,12 @@ def draw_detections(img, emotions, faces):
     """高质量标注绘制（带序号和背景框）"""
     output_img = img.copy()
     for i, ((x,y,w,h), emotion) in enumerate(zip(faces, emotions)):
-        # 颜色映射
+        # 颜色映射（新增愤怒的橙色）
         color_map = {
-            "happy": (0, 180, 0),    # 绿色
-            "neutral": (210, 210, 0), # 黄色
-            "sad": (0, 0, 180)       # 红色
+            "快乐": (0, 180, 0),    # 绿色
+            "平静": (210, 210, 0),  # 黄色
+            "悲伤": (0, 0, 180),    # 红色
+            "愤怒": (0, 100, 255)   # 橙色
         }
         color = color_map.get(emotion, (150,150,150))
         
@@ -82,15 +94,17 @@ def main():
                 if emotions:
                     # 中文字典映射
                     emotion_mapping = {
-                        "happy": "开心",
-                        "neutral": "平静",
-                        "sad": "伤心"
+                        "快乐": "开心",
+                        "平静": "平静",
+                        "悲伤": "伤心",
+                        "愤怒": "愤怒"
                     }
                     
                     emotion_count = {
-                        "开心": emotions.count("happy"),
-                        "平静": emotions.count("neutral"),
-                        "伤心": emotions.count("sad")
+                        "开心": emotions.count("快乐"),
+                        "平静": emotions.count("平静"),
+                        "伤心": emotions.count("悲伤"),
+                        "愤怒": emotions.count("愤怒")
                     }
                     
                     result = []
@@ -103,6 +117,7 @@ def main():
                     st.markdown("**检测原理**：")
                     st.write("""
                     - 😊 开心: 检测到明显笑容
+                    - 😠 愤怒: 眼睛睁大且位置偏高
                     - 😐 平静: 默认中性表情
                     - 😢 伤心: 眼睛位置偏高
                     """)
@@ -116,7 +131,7 @@ def main():
                     st.image(image, use_container_width=True)
                 with tab2:
                     st.image(detected_img, channels="BGR", use_container_width=True,
-                           caption=f"检测到 {len(faces)} 个人脸 | 标记: 序号:情绪")
+                           caption=f"检测到 {len(faces)} 个人脸")  # 修改为只显示人脸数量
                 
         except Exception as e:
             st.error(f"处理错误: {str(e)}")
