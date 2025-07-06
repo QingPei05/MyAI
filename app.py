@@ -46,26 +46,38 @@ def detect_emotion(img):
     return emotions, faces
 
 def draw_detections(img, emotions, faces):
-    """高质量标注绘制（带序号和背景框）"""
+    """优化后的标签绘制函数"""
     output_img = img.copy()
     for i, ((x,y,w,h), emotion) in enumerate(zip(faces, emotions)):
-        # 颜色映射（新增愤怒的橙色）
+        # 更醒目的颜色映射
         color_map = {
-            "快乐": (0, 180, 0),    # 绿色
-            "平静": (210, 210, 0),  # 黄色
-            "悲伤": (0, 0, 180),    # 红色
-            "愤怒": (0, 100, 255)   # 橙色
+            "快乐": (0, 200, 0),     # 更亮的绿色
+            "平静": (255, 255, 100),  # 更亮的黄色
+            "悲伤": (200, 50, 50),    # 更柔和的红色
+            "愤怒": (255, 150, 50)    # 更亮的橙色
         }
-        color = color_map.get(emotion, (150,150,150))
+        color = color_map.get(emotion, (200, 200, 200))
         
-        # 带背景的文本标签
-        text = f"{i+1}:{emotion}"
-        (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)
-        cv2.rectangle(output_img, (x, y-40), (x+text_w+10, y-10), color, -1)
-        cv2.putText(output_img, text, (x+5, y-20), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
+        # 优化标签样式
+        text = f"{emotion}"  # 移除了序号，只显示情绪
+        font_scale = 0.9 if w > 100 else 0.7  # 根据人脸大小调整字体
         
-        # 人脸框
+        # 计算文本大小和位置
+        (text_w, text_h), _ = cv2.getTextSize(text, cv2.FONT_HERSHEY_SIMPLEX, font_scale, 2)
+        
+        # 绘制背景框（圆角矩形效果）
+        cv2.rectangle(output_img, 
+                     (x, y - text_h - 20), 
+                     (x + text_w + 20, y - 10), 
+                     color, -1)
+        
+        # 绘制文字（居中显示）
+        cv2.putText(output_img, text, 
+                   (x + 10, y - 15), 
+                   cv2.FONT_HERSHEY_SIMPLEX, font_scale, 
+                   (255, 255, 255), 2, cv2.LINE_AA)
+        
+        # 绘制人脸框（更粗的线条）
         cv2.rectangle(output_img, (x,y), (x+w,y+h), color, 3)
     
     return output_img
