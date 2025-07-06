@@ -35,7 +35,7 @@ def detect_emotion(img):
     return emotions, faces
 
 def draw_detections(img, emotions, faces):
-    """在图像上绘制检测结果（字体大小调整为12px效果）"""
+    """在图像上绘制检测结果（调大情绪标签字体）"""
     for (x,y,w,h), emotion in zip(faces, emotions):
         # 人脸框颜色根据情绪变化
         color = {
@@ -45,8 +45,9 @@ def draw_detections(img, emotions, faces):
         }.get(emotion, (255,255,255))
         
         cv2.rectangle(img, (x,y), (x+w,y+h), color, 2)
-        cv2.putText(img, emotion, (x, y-10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)  # 0.6对应约12px
+        # 调大字体大小（从0.6增大到0.9），加粗（从2增大到3）
+        cv2.putText(img, emotion, (x, y-15),  # 文字位置略微上移
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 3)  
     
     return img
 
@@ -70,7 +71,7 @@ def main():
             col1, col2 = st.columns([1, 2])
             
             with col1:
-                # 情绪统计结果（纯文字）
+                # 情绪统计结果
                 st.subheader("检测结果")
                 if emotions:
                     emotion_count = {
