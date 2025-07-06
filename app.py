@@ -16,7 +16,7 @@ def load_models():
 face_cascade, eye_cascade, smile_cascade = load_models()
 
 def detect_emotion(img):
-    """Detect emotions with confidence levels"""
+    """Enhanced emotion detection with more robust logic"""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
     
@@ -25,46 +25,43 @@ def detect_emotion(img):
     for (x,y,w,h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
         
-        # Detect smiles with stricter parameters for better accuracy
+        # Detect facial features
         smiles = smile_cascade.detectMultiScale(
             roi_gray, 
             scaleFactor=1.8, 
             minNeighbors=20,
             minSize=(25, 25)
-        )
-        # Detect eyes with minimum size requirement
         eyes = eye_cascade.detectMultiScale(
             roi_gray,
             minSize=(30, 30))
         
-        # Initialize with neutral and medium confidence
+        # Initialize emotion with neutral and medium confidence
         emotion = "neutral"
-        confidence = 0.5  # Default confidence for neutral
+        confidence = 0.5
         
-        # Anger detection
+        # Eye-based emotion detection
         if len(eyes) >= 2:
             eye_centers = [y + ey + eh/2 for (ex,ey,ew,eh) in eyes[:2]]
             avg_eye_height = np.mean(eye_centers)
             eye_sizes = [eh for (ex,ey,ew,eh) in eyes[:2]]
             avg_eye_size = np.mean(eye_sizes)
             
-            # More precise anger detection with higher confidence
+            # Anger detection (more precise)
             if avg_eye_size > h/4.5 and avg_eye_height < h/2.7:
                 emotion = "angry"
-                confidence = 0.7  # Higher confidence for clear anger signs
-            
-            # Improved sadness detection with moderate confidence
+                confidence = 0.7
+            # Sad detection (improved threshold)
             elif avg_eye_height < h/3.2:
                 emotion = "sad"
-                confidence = 0.6  # Moderate confidence for sadness
+                confidence = 0.6
         
-        # Happiness detection (highest priority and confidence)
+        # Happiness detection (priority, with better smile verification)
         if len(smiles) > 0:
-            # Only consider smiles in the lower half of the face for better accuracy
+            # Only consider smiles in the lower half of the face
             valid_smiles = [s for s in smiles if s[1] > h/2]
             if len(valid_smiles) > 0:
                 emotion = "happy"
-                confidence = 0.8  # Highest confidence for detected smiles
+                confidence = 0.8
         
         emotions.append(emotion)
         confidence_scores.append(confidence)
@@ -72,7 +69,7 @@ def detect_emotion(img):
     return emotions, faces, confidence_scores
 
 def draw_detections(img, emotions, faces, confidences):
-    """Draw detection boxes with labels and confidence"""
+    """Enhanced visualization with confidence indicators"""
     output_img = img.copy()
     
     # Color and emoji mapping
@@ -96,7 +93,7 @@ def draw_detections(img, emotions, faces, confidences):
         # Draw face rectangle
         cv2.rectangle(output_img, (x,y), (x+w,y+h), color, 3)
         
-        # Add emotion label with confidence percentage
+        # Add emotion label with confidence
         label = f"{emoji} {emotion.upper()} ({conf*100:.0f}%)"
         cv2.putText(output_img, 
                    label,
@@ -109,17 +106,17 @@ def draw_detections(img, emotions, faces, confidences):
     return output_img
 
 def show_detection_guide():
-    """Show detection guide with confidence explanation"""
+    """Show detection guide in expandable section"""
     with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
         st.markdown("""
         **Detection Logic Explained:**
         
-        - 😊 **Happy** (80% confidence): Detected when smile is present in lower face region
-        - 😠 **Angry** (70% confidence): Eyes wide open and positioned in upper face
-        - 😐 **Neutral** (50% confidence): Default state when no strong indicators found
-        - 😢 **Sad** (60% confidence): Eyes positioned higher than normal
+        - 😊 **Happy**: Detected when smile is present in lower face region
+        - 😠 **Angry**: Detected when eyes are wide open and positioned in upper face
+        - 😐 **Neutral**: Default state when no strong indicators found
+        - 😢 **Sad**: Detected when eyes are positioned higher than normal
         
-        **Confidence Levels:**
+        **Confidence Scores:**
         - 80-100%: Strong indicators present
         - 60-79%: Moderate confidence
         - Below 60%: Weak indicators
@@ -132,14 +129,36 @@ def show_detection_guide():
 
 def main():
     st.set_page_config(
-        page_title="Emotion Detection System", 
+        page_title="Enhanced Emotion Detection", 
         layout="wide",
         page_icon="😊"
     )
     
-    st.title("😊 Emotion Detection with Confidence Levels")
+    # Custom CSS for better styling
+    st.markdown("""
+    <style>
+    .st-emotion-caption {
+        font-size: 16px !important;
+        text-align: center !important;
+    }
+    .stImage > img {
+        border-radius: 10px;
+    }
+    .st-bb {
+        background-color: #f0f2f6;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
-    uploaded_file = st.file_uploader("Upload Image (JPG/PNG)", type=["jpg", "png"])
+    st.title("😊 Enhanced Emotion Detection System")
+    st.markdown("Upload an image to detect emotions using computer vision")
+    
+    # File uploader with more options
+    uploaded_file = st.file_uploader(
+        "Choose an image...", 
+        type=["jpg", "jpeg", "png"],
+        help="Select a clear image containing faces"
+    )
     
     if uploaded_file:
         try:
@@ -151,33 +170,58 @@ def main():
             emotions, faces, confidences = detect_emotion(img)
             detected_img = draw_detections(img.copy(), emotions, faces, confidences)
             
-            # Two-column layout
+            # Main layout
             col1, col2 = st.columns([1, 2])
             
             with col1:
                 st.subheader("🔍 Detection Results")
+                
                 if emotions:
-                    # Display summary with confidence percentages
+                    # Display summary
                     result = []
-                    for emo, conf in zip(emotions, confidences):
-                        result.append(f"{emo.capitalize()} ({conf*100:.0f}%)")
+                    for emo, cnt in zip(emotions, confidences):
+                        result.append(f"{emo.capitalize()} ({cnt*100:.0f}%)")
+                    
                     st.success(f"Detected {len(faces)} face(s): " + ", ".join(result))
                     
-                    # Show enhanced detection guide
+                    # Show detection guide
                     show_detection_guide()
                 else:
-                    st.warning("No faces detected")
+                    st.warning("No faces detected in the image")
+                    st.image(image, use_container_width=True, caption="Uploaded Image")
             
             with col2:
-                tab1, tab2 = st.tabs(["Original Image", "Analysis Result"])
-                with tab1:
-                    st.image(image, use_container_width=True)
-                with tab2:
-                    st.image(detected_img, channels="BGR", use_container_width=True,
-                           caption=f"Detected {len(faces)} faces with confidence levels")
+                tab1, tab2 = st.tabs(["📷 Original Image", "🔬 Analysis Result"])
                 
+                with tab1:
+                    st.image(image, 
+                            use_container_width=True,
+                            caption="Original Image")
+                
+                with tab2:
+                    if faces:
+                        st.image(detected_img, 
+                               channels="BGR", 
+                               use_container_width=True,
+                               caption=f"Detected {len(faces)} face(s) with emotions")
+                    else:
+                        st.image(image,
+                               use_container_width=True,
+                               caption="No faces detected (original image)")
+            
+            # Add download button for analyzed image
+            if faces:
+                st.markdown("---")
+                st.download_button(
+                    label="⬇️ Download Analyzed Image",
+                    data=cv2.imencode('.jpg', detected_img)[1].tobytes(),
+                    file_name="analyzed_emotion.jpg",
+                    mime="image/jpeg"
+                )
+        
         except Exception as e:
-            st.error(f"Processing error: {str(e)}")
+            st.error(f"⚠️ Processing error: {str(e)}")
+            st.info("Please try another image or check if the file is valid")
 
 if __name__ == "__main__":
     main()
