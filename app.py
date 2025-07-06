@@ -134,7 +134,7 @@ def process_uploaded_file(uploaded_file):
 
 def main():
     st.set_page_config(page_title="智能情绪检测", layout="wide")
-    st.title("🤖 AI情绪分析系统")
+    st.title("🎭 AI情绪分析系统")
     
     uploaded_file = st.file_uploader(
         "上传图片或视频（支持JPG/PNG/MP4）", 
