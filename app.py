@@ -125,11 +125,17 @@ def main():
             with col1:
                 st.subheader("🔍 Detection Results")
                 if emotions:
-                    # Display summary in the new format
-                    result = []
+                    # Count each emotion type
+                    emotion_count = {}
                     for emo in emotions:
-                        result.append(f"{emo.capitalize()}")
-                    st.success(f"Detected {len(faces)} face(s): " + ", ".join(result))
+                        emotion_count[emo] = emotion_count.get(emo, 0) + 1
+                    
+                    # Format the result string
+                    result_parts = []
+                    for emo, count in emotion_count.items():
+                        result_parts.append(f"{count} {emo.capitalize()}")
+                    
+                    st.success(f"Detected {len(faces)} face(s): " + ", ".join(result_parts))
                     
                     # Show detection guide
                     show_detection_guide()
