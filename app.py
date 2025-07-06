@@ -67,7 +67,7 @@ def process_image(uploaded_file):
     with col2:
         tab1, tab2 = st.tabs(["原始图片", "分析结果"])
         with tab1:
-            st.image(image, use_container_width=True)
+            st.image(image, use_column_width=True)
         with tab2:
             marked_img = img.copy()
             for (x, y, w, h), emotion in zip(faces, emotions):
@@ -82,7 +82,7 @@ def process_image(uploaded_file):
                 cv2.putText(marked_img, emotion, (x, y-5), 
                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
             
-            st.image(marked_img, channels="BGR", use_container_width=True)
+            st.image(marked_img, channels="BGR", use_column_width=True)
 
 def main():
     st.set_page_config(page_title="基本情绪检测系统", layout="centered")
