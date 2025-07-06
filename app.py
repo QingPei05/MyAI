@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
 import streamlit as st
-from PIL import Image
+from PIL import ImageDraw, ImageFont
 
 # 加载预训练模型
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
