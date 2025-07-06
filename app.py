@@ -48,7 +48,7 @@ def process_uploaded_file(uploaded_file):
         # 显示结果
         col1, col2 = st.columns(2)
         with col1:
-            st.image(image, caption="原始图片", use_column_width=True)
+            st.image(image, caption="原始图片", use_container_width=True)
         
         # 统计情绪
         emotion_count = {}
@@ -57,7 +57,7 @@ def process_uploaded_file(uploaded_file):
         
         # 简化输出格式
         with col2:
-            st.image(img, channels="BGR", caption="分析结果", use_column_width=True)
+            st.image(img, channels="BGR", caption="分析结果", use_container_width=True)
             st.subheader("情绪统计")
             if emotion_count:
                 result_text = "，".join([f"{count}人{emotion}" for emotion, count in emotion_count.items()])
