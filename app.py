@@ -2,135 +2,107 @@ import cv2
 import numpy as np
 import streamlit as st
 from PIL import Image
+import tempfile
 
-# 加载预训练模型
+# 初始化检测器
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
 smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
 
-def detect_emotion(img):
-    """使用OpenCV检测情绪（happy/neutral/sad）"""
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+def detect_emotion(frame):
+    """单帧情绪检测函数（与之前相同）"""
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
-    
     results = []
     for (x,y,w,h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
-        roi_color = img[y:y+h, x:x+w]
-        
-        # 检测微笑
         smiles = smile_cascade.detectMultiScale(roi_gray, scaleFactor=1.8, minNeighbors=20)
-        # 检测眼睛
         eyes = eye_cascade.detectMultiScale(roi_gray)
-        
-        # 情绪判断逻辑
-        emotion = "neutral"  # 默认中性
+        emotion = "neutral"
         if len(smiles) > 0:
             emotion = "happy"
-        elif len(eyes) > 0:
-            if eyes[0][1] < h/3:  # 眼睛位置偏高
-                emotion = "sad"
-        
-        results.append({
-            "box": [x,y,w,h],
-            "emotion": emotion,
-            "landmarks": {
-                "eyes": [(x+ex, y+ey, ew, eh) for (ex,ey,ew,eh) in eyes],
-                "smiles": [(x+sx, y+sy, sw, sh) for (sx,sy,sw,sh) in smiles]
-            }
-        })
-    
+        elif len(eyes) > 0 and eyes[0][1] < h/3:
+            emotion = "sad"
+        results.append({"box": [x,y,w,h], "emotion": emotion})
     return results
 
-def draw_detections(img, results):
-    """在图像上绘制检测结果"""
-    for result in results:
-        x,y,w,h = result["box"]
-        
-        # 绘制人脸框（颜色根据情绪变化）
-        color = {
-            "happy": (0, 255, 0),    # 绿色
-            "neutral": (255, 255, 0), # 黄色
-            "sad": (0, 0, 255)       # 红色
-        }.get(result["emotion"], (255,255,255))
-        
-        cv2.rectangle(img, (x,y), (x+w,y+h), color, 2)
-        
-        # 标记情绪文本
-        cv2.putText(img, result["emotion"], (x, y-10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-        
-        # 绘制眼睛和微笑区域
-        for (ex,ey,ew,eh) in result["landmarks"]["eyes"]:
-            cv2.rectangle(img, (ex,ey), (ex+ew,ey+eh), (255,0,0), 1)
-        for (sx,sy,sw,sh) in result["landmarks"]["smiles"]:
-            cv2.rectangle(img, (sx,sy), (sx+sw,sy+sh), (0,255,255), 1)
+def process_video(video_path):
+    """处理视频文件的核心函数"""
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    st.write(f"视频参数: {int(fps)} FPS, 总帧数: {int(cap.get(cv2.CAP_PROP_FRAME_COUNT))}")
     
-    return img
+    # 创建视频输出器
+    output_path = "output.mp4"
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, 
+                         (int(cap.get(3)), int(cap.get(4))))
+    
+    # 进度条
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    frame_count = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        # 处理每一帧
+        results = detect_emotion(frame)
+        for result in results:
+            x,y,w,h = result["box"]
+            color = {"happy": (0,255,0), "sad": (0,0,255)}.get(result["emotion"], (255,255,0))
+            cv2.rectangle(frame, (x,y), (x+w,y+h), color, 2)
+            cv2.putText(frame, result["emotion"], (x,y-10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+        
+        out.write(frame)
+        frame_count += 1
+        progress_bar.progress(frame_count / int(cap.get(cv2.CAP_PROP_FRAME_COUNT)))
+        status_text.text(f"已处理 {frame_count} 帧...")
+    
+    cap.release()
+    out.release()
+    return output_path
 
 def main():
-    st.set_page_config(page_title="OpenCV情绪检测", layout="wide")
-    st.title("😊 实时情绪分析")
+    st.set_page_config(page_title="视频情绪检测", layout="wide")
+    st.title("🎥 视频情绪分析系统")
     
     # 模式选择
     analysis_mode = st.radio(
-        "选择输入模式",
-        ["上传图片", "实时摄像头"],
+        "选择输入类型",
+        ["图片检测", "视频检测"],
         horizontal=True
     )
     
-    if analysis_mode == "上传图片":
-        uploaded_file = st.file_uploader("上传图片（JPG/PNG）", type=["jpg", "png"])
+    if analysis_mode == "图片检测":
+        uploaded_file = st.file_uploader("上传图片", type=["jpg", "png"])
         if uploaded_file:
-            try:
-                # 转换图片格式
-                image = Image.open(uploaded_file)
-                img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-                
-                # 检测情绪
-                results = detect_emotion(img)
-                detected_img = draw_detections(img.copy(), results)
-                
-                # 显示结果
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.image(image, caption="原始图片", use_column_width=True)
-                with col2:
-                    st.image(detected_img, channels="BGR", caption="分析结果", use_column_width=True)
-                
-                # 文字结果
-                for i, result in enumerate(results):
-                    st.markdown(f"**人脸 {i+1}**:")
-                    st.write(f"- 情绪: `{result['emotion']}`")
-                    st.write(f"- 位置: `{result['box']}`")
-                    
-            except Exception as e:
-                st.error(f"处理错误: {str(e)}")
+            image = Image.open(uploaded_file)
+            img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+            results = detect_emotion(img)
+            detected_img = img.copy()
+            for result in results:
+                x,y,w,h = result["box"]
+                color = {"happy": (0,255,0), "sad": (0,0,255)}.get(result["emotion"], (255,255,0))
+                cv2.rectangle(detected_img, (x,y), (x+w,y+h), color, 2)
+            st.image(detected_img, channels="BGR", caption="检测结果")
     
-    else:  # 实时摄像头模式
-        st.warning("注意：摄像头功能需要本地运行或启用浏览器权限")
-        run_camera = st.checkbox("启动摄像头")
-        frame_placeholder = st.empty()
-        
-        if run_camera:
-            cap = cv2.VideoCapture(0)
-            stop_button = st.button("停止")
+    else:  # 视频检测模式
+        uploaded_video = st.file_uploader("上传视频", type=["mp4", "avi"])
+        if uploaded_video:
+            # 保存临时视频文件
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+                tmp.write(uploaded_video.read())
+                video_path = tmp.name
             
-            while cap.isOpened() and not stop_button:
-                ret, frame = cap.read()
-                if not ret:
-                    st.error("无法获取摄像头画面")
-                    break
-                
-                # 实时分析
-                results = detect_emotion(frame)
-                detected_frame = draw_detections(frame, results)
-                
-                # 显示实时画面
-                frame_placeholder.image(detected_frame, channels="BGR")
-            
-            cap.release()
-            cv2.destroyAllWindows()
+            st.video(uploaded_video)
+            if st.button("开始分析视频"):
+                output_path = process_video(video_path)
+                st.success("分析完成！")
+                st.video(output_path, format="video/mp4")
 
 if __name__ == "__main__":
     main()
