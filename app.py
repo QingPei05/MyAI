@@ -1,5 +1,15 @@
+import cv2
+import numpy as np
+import streamlit as st
+from PIL import Image
+
+# Load pre-trained models
+face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
+smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
+
 def detect_emotion(img):
-    """使用OpenCV检测情绪（返回英文标签）"""
+    """Detect emotions using OpenCV (happy, neutral, sad, angry)"""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
     
@@ -7,15 +17,15 @@ def detect_emotion(img):
     for (x,y,w,h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
         
-        # 检测微笑
+        # Detect smiles
         smiles = smile_cascade.detectMultiScale(roi_gray, scaleFactor=1.8, minNeighbors=20)
-        # 检测眼睛
+        # Detect eyes
         eyes = eye_cascade.detectMultiScale(roi_gray)
         
-        # 情绪判断逻辑（英文标签）
-        emotion = "neutral"  # 默认
+        # Emotion detection logic
+        emotion = "neutral"  # default
         
-        # 愤怒判断
+        # Anger detection
         if len(eyes) >= 2:
             eye_centers = [y + ey + eh/2 for (ex,ey,ew,eh) in eyes[:2]]
             avg_eye_height = np.mean(eye_centers)
@@ -27,7 +37,7 @@ def detect_emotion(img):
             elif avg_eye_height < h/3:
                 emotion = "sad"
         
-        # 快乐判断
+        # Happiness detection (priority)
         if len(smiles) > 0:
             emotion = "happy"
         
@@ -36,24 +46,24 @@ def detect_emotion(img):
     return emotions, faces
 
 def draw_detections(img, emotions, faces):
-    """绘制英文标签"""
+    """Draw detection boxes with English labels"""
     output_img = img.copy()
     
-    # 颜色映射
+    # Color mapping
     color_map = {
-        "happy": (0, 255, 0),    # 绿色
-        "neutral": (255, 255, 0), # 黄色
-        "sad": (0, 0, 255),      # 红色
-        "angry": (0, 165, 255)    # 橙色
+        "happy": (0, 255, 0),     # green
+        "neutral": (255, 255, 0), # yellow
+        "sad": (0, 0, 255),       # red
+        "angry": (0, 165, 255)    # orange
     }
     
     for i, ((x,y,w,h), emotion) in enumerate(zip(faces, emotions)):
         color = color_map.get(emotion, (255, 255, 255))
         
-        # 绘制人脸框
+        # Draw face rectangle
         cv2.rectangle(output_img, (x,y), (x+w,y+h), color, 3)
         
-        # 添加英文标签
+        # Add emotion label
         cv2.putText(output_img, 
                    emotion.upper(), 
                    (x+5, y-10), 
@@ -65,22 +75,22 @@ def draw_detections(img, emotions, faces):
     return output_img
 
 def main():
-    st.set_page_config(page_title="Emotion Detection", layout="wide")
+    st.set_page_config(page_title="Emotion Detection System", layout="wide")
     st.title("😊 Emotion Detection")
     
     uploaded_file = st.file_uploader("Upload Image (JPG/PNG)", type=["jpg", "png"])
     
     if uploaded_file:
         try:
-            # 转换图片格式
+            # Convert image format
             image = Image.open(uploaded_file)
             img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
             
-            # 检测情绪
+            # Detect emotions
             emotions, faces = detect_emotion(img)
             detected_img = draw_detections(img.copy(), emotions, faces)
             
-            # 使用两列布局
+            # Two-column layout
             col1, col2 = st.columns([1, 2])
             
             with col1:
@@ -104,19 +114,22 @@ def main():
                     st.write("""
                     - 😊 Happy: Detected smile
                     - 😠 Angry: Wide open eyes in upper face
-                    - 😐 Neutral: Default expression
+                    - 😐 Neutral: Default neutral expression
                     - 😢 Sad: Eyes positioned higher
                     """)
                 else:
                     st.warning("No faces detected")
             
             with col2:
-                tab1, tab2 = st.tabs(["Original", "Analysis"])
+                tab1, tab2 = st.tabs(["Original Image", "Analysis Result"])
                 with tab1:
-                    st.image(image, use_column_width=True)
+                    st.image(image, use_container_width=True)
                 with tab2:
-                    st.image(detected_img, channels="BGR", use_column_width=True,
+                    st.image(detected_img, channels="BGR", use_container_width=True,
                            caption=f"Detected {len(faces)} faces")
                 
         except Exception as e:
             st.error(f"Processing error: {str(e)}")
+
+if __name__ == "__main__":
+    main()
