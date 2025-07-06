@@ -65,7 +65,7 @@ def process_uploaded_file(uploaded_file):
             # 并排显示原图和分析结果
             tab1, tab2 = st.tabs(["原始图片", "分析结果"])
             with tab1:
-                st.image(image, use_container_width=True)
+                st.image(image, use_column_width=True)
             with tab2:
                 marked_img = img.copy()
                 for (x, y, w, h), emotion in zip(
@@ -81,7 +81,7 @@ def process_uploaded_file(uploaded_file):
                     cv2.rectangle(marked_img, (x, y), (x+w, y+h), color, 2)
                     cv2.putText(marked_img, emotion, (x, y-10),  # 添加英文情绪标签
                                cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-                st.image(marked_img, channels="BGR", use_cintainer_width=True)
+                st.image(marked_img, channels="BGR", use_column_width=True)
 
 def main():
     st.set_page_config(page_title="情绪检测系统", layout="centered")
