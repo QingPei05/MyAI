@@ -34,7 +34,7 @@ def detect_emotion(img):
         )
         eyes = eye_cascade.detectMultiScale(
             roi_gray,
-            minSize=(30, 30)
+            minSize=(30, 30))
         
         # Initialize emotion with neutral and medium confidence
         emotion = "neutral"
