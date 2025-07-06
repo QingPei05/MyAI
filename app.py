@@ -13,10 +13,9 @@ def detect_emotion(img):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
     
-    results = []
+    emotions = []
     for (x,y,w,h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
-        roi_color = img[y:y+h, x:x+w]
         
         # Detect smiles
         smiles = smile_cascade.detectMultiScale(roi_gray, scaleFactor=1.8, minNeighbors=20)
@@ -31,46 +30,29 @@ def detect_emotion(img):
             if eyes[0][1] < h/3:  # Eyes positioned high
                 emotion = "sad"
         
-        results.append({
-            "box": [x,y,w,h],
-            "emotion": emotion,
-            "landmarks": {
-                "eyes": [(x+ex, y+ey, ew, eh) for (ex,ey,ew,eh) in eyes],
-                "smiles": [(x+sx, y+sy, sw, sh) for (sx,sy,sw,sh) in smiles]
-            }
-        })
+        emotions.append(emotion)
     
-    return results
+    return emotions
 
-def draw_detections(img, results):
+def draw_detections(img, emotions, faces):
     """Draw detection results on image"""
-    for result in results:
-        x,y,w,h = result["box"]
-        
+    for (x,y,w,h), emotion in zip(faces, emotions):
         # Face box color by emotion
         color = {
             "happy": (0, 255, 0),    # Green
             "neutral": (255, 255, 0), # Yellow
             "sad": (0, 0, 255)       # Red
-        }.get(result["emotion"], (255,255,255))
+        }.get(emotion, (255,255,255))
         
         cv2.rectangle(img, (x,y), (x+w,y+h), color, 2)
-        
-        # Emotion label
-        cv2.putText(img, result["emotion"], (x, y-10), 
+        cv2.putText(img, emotion, (x, y-10), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-        
-        # Draw eyes and smile areas
-        for (ex,ey,ew,eh) in result["landmarks"]["eyes"]:
-            cv2.rectangle(img, (ex,ey), (ex+ew,ey+eh), (255,0,0), 1)
-        for (sx,sy,sw,sh) in result["landmarks"]["smiles"]:
-            cv2.rectangle(img, (sx,sy), (sx+sw,sy+sh), (0,255,255), 1)
     
     return img
 
 def main():
     st.set_page_config(page_title="Emotion Detection", layout="wide")
-    st.title("😊 Emotion Detection (OpenCV)")
+    st.title("😊 Emotion Detection")
     
     uploaded_file = st.file_uploader("Upload Image (JPG/PNG)", type=["jpg", "png"])
     
@@ -80,9 +62,13 @@ def main():
             image = Image.open(uploaded_file)
             img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
             
-            # Detect emotions
-            results = detect_emotion(img)
-            detected_img = draw_detections(img.copy(), results)
+            # Detect faces and emotions
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+            emotions = detect_emotion(img)
+            
+            # Draw detections
+            detected_img = draw_detections(img.copy(), emotions, faces)
             
             # Display results
             col1, col2 = st.columns(2)
@@ -91,11 +77,13 @@ def main():
             with col2:
                 st.image(detected_img, channels="BGR", caption="Analysis Result", use_container_width=True)
             
-            # Text results
-            for i, result in enumerate(results):
-                st.markdown(f"**Face {i+1}**:")
-                st.write(f"- Emotion: `{result['emotion']}`")
-                st.write(f"- Position: `{result['box']}`")
+            # Display only emotions
+            st.subheader("Detection Results")
+            if emotions:
+                for i, emotion in enumerate(emotions):
+                    st.write(f"Person {i+1}: {emotion}")
+            else:
+                st.write("No faces detected")
                 
         except Exception as e:
             st.error(f"Processing error: {str(e)}")
