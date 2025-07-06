@@ -83,9 +83,9 @@ def main():
                 result_img = detect_emotion(img.copy())
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.image(image, caption="原始图片", use_column_width=True)
+                    st.image(image, caption="原始图片", use_container_width=True)
                 with col2:
-                    st.image(result_img, channels="BGR", caption="分析结果", use_column_width=True)
+                    st.image(result_img, channels="BGR", caption="分析结果", use_container_width=True)
                     
             except Exception as e:
                 st.error(f"图片处理失败: {str(e)}")
