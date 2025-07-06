@@ -25,13 +25,13 @@ def detect_emotion(frame):
         
         # 情绪判断逻辑
         if len(smiles) > 3:
-            emotions.append("兴奋")
+            emotions.append("excited")
         elif len(smiles) > 0:
-            emotions.append("开心")
+            emotions.append("happy")
         elif len(eyes) > 0 and eyes[0][1] / h < 0.3:
-            emotions.append("难受")
+            emotions.append("sad")
         else:
-            emotions.append("中性")
+            emotions.append("neutral")
     
     return emotions
 
@@ -51,7 +51,7 @@ def process_uploaded_file(uploaded_file):
             emotion_count[e] = emotion_count.get(e, 0) + 1
         
         # 新布局：左侧统计，右侧图片
-        col1, col2 = st.columns([1, 2])  # 左侧窄，右侧宽
+        col1, col2 = st.columns([1, 2])
         
         with col1:
             st.subheader("情绪统计")
@@ -60,11 +60,6 @@ def process_uploaded_file(uploaded_file):
                 st.success(f"**检测结果**: {result_text}")
             else:
                 st.warning("未检测到人脸")
-            
-            # 添加删除按钮（示例）
-            if st.button("删除分析结果", type="primary"):
-                st.session_state.clear()
-                st.rerun()
         
         with col2:
             # 并排显示原图和分析结果
@@ -78,17 +73,15 @@ def process_uploaded_file(uploaded_file):
                     emotions
                 ):
                     color = {
-                        "开心": (0, 255, 0),
-                        "兴奋": (0, 255, 255),
-                        "难受": (0, 0, 255),
-                        "中性": (255, 255, 0)
+                        "happy": (0, 255, 0),      # 绿色
+                        "excited": (0, 255, 255),  # 黄色
+                        "sad": (0, 0, 255),        # 红色
+                        "neutral": (255, 255, 0)   # 青色
                     }.get(emotion, (255, 255, 255))
                     cv2.rectangle(marked_img, (x, y), (x+w, y+h), color, 2)
+                    cv2.putText(marked_img, emotion, (x, y-10),  # 添加英文情绪标签
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
                 st.image(marked_img, channels="BGR", use_column_width=True)
-
-    elif file_type == "video":
-        # 视频处理逻辑（保持不变）
-        pass
 
 def main():
     st.set_page_config(page_title="情绪检测系统", layout="centered")
