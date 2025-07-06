@@ -2,6 +2,8 @@ import cv2
 import numpy as np
 import streamlit as st
 from PIL import Image
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # Load pre-trained models
 @st.cache_resource
@@ -19,13 +21,21 @@ def detect_emotion(img):
     faces = face_cascade.detectMultiScale(gray, 1.3, 5)
     
     emotions = []
-    confidences = []
+    confidence_scores = []
     for (x,y,w,h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
         
-        # Detect facial features
-        smiles = smile_cascade.detectMultiScale(roi_gray, scaleFactor=1.8, minNeighbors=20)
-        eyes = eye_cascade.detectMultiScale(roi_gray)
+        # Detect smiles with stricter parameters for better accuracy
+        smiles = smile_cascade.detectMultiScale(
+            roi_gray, 
+            scaleFactor=1.8, 
+            minNeighbors=20,
+            minSize=(25, 25)
+        )
+        # Detect eyes with minimum size requirement
+        eyes = eye_cascade.detectMultiScale(
+            roi_gray,
+            minSize=(30, 30))
         
         # Initialize with neutral and medium confidence
         emotion = "neutral"
@@ -38,22 +48,28 @@ def detect_emotion(img):
             eye_sizes = [eh for (ex,ey,ew,eh) in eyes[:2]]
             avg_eye_size = np.mean(eye_sizes)
             
-            if avg_eye_size > h/5 and avg_eye_height < h/2.5:
+            # More precise anger detection with higher confidence
+            if avg_eye_size > h/4.5 and avg_eye_height < h/2.7:
                 emotion = "angry"
                 confidence = 0.7  # Higher confidence for clear anger signs
-            elif avg_eye_height < h/3:
+            
+            # Improved sadness detection with moderate confidence
+            elif avg_eye_height < h/3.2:
                 emotion = "sad"
                 confidence = 0.6  # Moderate confidence for sadness
         
-        # Happiness detection (priority)
+        # Happiness detection (highest priority and confidence)
         if len(smiles) > 0:
-            emotion = "happy"
-            confidence = 0.8  # High confidence for detected smiles
+            # Only consider smiles in the lower half of the face for better accuracy
+            valid_smiles = [s for s in smiles if s[1] > h/2]
+            if len(valid_smiles) > 0:
+                emotion = "happy"
+                confidence = 0.8  # Highest confidence for detected smiles
         
         emotions.append(emotion)
-        confidences.append(confidence)
+        confidence_scores.append(confidence)
     
-    return emotions, faces, confidences
+    return emotions, faces, confidence_scores
 
 def draw_detections(img, emotions, faces, confidences):
     """Draw detection boxes with labels and confidence"""
@@ -80,7 +96,7 @@ def draw_detections(img, emotions, faces, confidences):
         # Draw face rectangle
         cv2.rectangle(output_img, (x,y), (x+w,y+h), color, 3)
         
-        # Add emotion label with confidence
+        # Add emotion label with confidence percentage
         label = f"{emoji} {emotion.upper()} ({conf*100:.0f}%)"
         cv2.putText(output_img, 
                    label,
@@ -98,7 +114,7 @@ def show_detection_guide():
         st.markdown("""
         **Detection Logic Explained:**
         
-        - 😊 **Happy** (80% confidence): Detected when smile is present
+        - 😊 **Happy** (80% confidence): Detected when smile is present in lower face region
         - 😠 **Angry** (70% confidence): Eyes wide open and positioned in upper face
         - 😐 **Neutral** (50% confidence): Default state when no strong indicators found
         - 😢 **Sad** (60% confidence): Eyes positioned higher than normal
@@ -131,7 +147,7 @@ def main():
             image = Image.open(uploaded_file)
             img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
             
-            # Detect emotions with confidence
+            # Detect emotions with confidence scores
             emotions, faces, confidences = detect_emotion(img)
             detected_img = draw_detections(img.copy(), emotions, faces, confidences)
             
@@ -141,13 +157,13 @@ def main():
             with col1:
                 st.subheader("🔍 Detection Results")
                 if emotions:
-                    # Display summary with confidence
+                    # Display summary with confidence percentages
                     result = []
                     for emo, conf in zip(emotions, confidences):
                         result.append(f"{emo.capitalize()} ({conf*100:.0f}%)")
                     st.success(f"Detected {len(faces)} face(s): " + ", ".join(result))
                     
-                    # Show detection guide
+                    # Show enhanced detection guide
                     show_detection_guide()
                 else:
                     st.warning("No faces detected")
