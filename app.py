@@ -30,7 +30,7 @@ def detect_emotion(img):
             roi_gray, 
             scaleFactor=1.8, 
             minNeighbors=20,
-            minSize=(25, 25)
+            minSize=(25, 25))
         eyes = eye_cascade.detectMultiScale(
             roi_gray,
             minSize=(30, 30))
