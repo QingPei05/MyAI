@@ -90,11 +90,11 @@ def draw_detections(img, emotions, faces):
         pil_img = Image.fromarray(cv2.cvtColor(output_img, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(pil_img)
         
-        # 使用textbbox获取文本尺寸（兼容Pillow 9.0.0+）
+        # 获取文本尺寸 (Pillow 10.1.0兼容方式)
         text = emotion
-        bbox = draw.textbbox((0, 0), text, font=font)
-        text_width = bbox[2] - bbox[0]
-        text_height = bbox[3] - bbox[1]
+        left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+        text_width = right - left
+        text_height = bottom - top
         
         # 绘制文本背景框
         draw.rectangle(
