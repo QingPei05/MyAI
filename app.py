@@ -1,25 +1,30 @@
 import cv2
 import numpy as np
 import streamlit as st
-from moviepy.editor import VideoFileClip
+from PIL import Image
 import tempfile
+import os
+from moviepy.editor import VideoFileClip
 
-# 初始化检测器（使用更快的参数）
+# 初始化检测器（快速参数）
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
 
-def detect_emotion_fast(frame):
-    """极速情绪检测（仅返回情绪标签）"""
-    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)  # 更快的参数
+# 会话状态存储
+if 'uploaded_files' not in st.session_state:
+    st.session_state.uploaded_files = []
+
+def detect_emotion_fast(img):
+    """极速情绪检测"""
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5)
     
     emotions = []
-    for (x, y, w, h) in faces:
+    for (x,y,w,h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
         smiles = smile_cascade.detectMultiScale(roi_gray, scaleFactor=1.7, minNeighbors=15)
         
-        # 极简情绪判断
-        if len(smiles) > 3:  # 检测到多个微笑区域
+        if len(smiles) > 3:
             emotions.append("兴奋")
         elif len(smiles) > 0:
             emotions.append("开心")
@@ -28,74 +33,104 @@ def detect_emotion_fast(frame):
     
     return emotions
 
-def process_video_fast(uploaded_file):
-    """10秒内完成的视频处理"""
-    # 保存临时文件
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-        tmp.write(uploaded_file.read())
-        input_path = tmp.name
+def process_media(file):
+    """自动处理图片/视频"""
+    file_type = file.type.split('/')[0]
+    temp_path = None
     
-    # 读取视频并降帧率
-    clip = VideoFileClip(input_path)
-    if clip.duration > 10:  # 如果视频超过10秒，截取前10秒
-        clip = clip.subclip(0, 10)
+    try:
+        if file_type == "image":
+            # 处理图片
+            img = Image.open(file)
+            cv_img = cv2.cvtColor(np.array(img), cv2.COLOR_RGB2BGR)
+            emotions = detect_emotion_fast(cv_img)
+            
+            # 存储结果
+            st.session_state.uploaded_files.append({
+                "name": file.name,
+                "type": "image",
+                "emotions": emotions,
+                "data": img,
+                "temp_path": None
+            })
+            
+        elif file_type == "video":
+            # 保存临时视频文件
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
+                tmp.write(file.read())
+                temp_path = tmp.name
+            
+            # 快速分析前10秒
+            clip = VideoFileClip(temp_path).subclip(0, min(10, VideoFileClip(temp_path).duration))
+            emotions = []
+            for frame in clip.iter_frames(fps=5):  # 降帧分析
+                frame = cv2.resize(frame, (640, 360))
+                emotions.extend(detect_emotion_fast(frame))
+            
+            # 统计情绪
+            emotion_count = {}
+            for e in emotions:
+                emotion_count[e] = emotion_count.get(e, 0) + 1
+            
+            st.session_state.uploaded_files.append({
+                "name": file.name,
+                "type": "video",
+                "emotions": emotion_count,
+                "data": temp_path,
+                "temp_path": temp_path
+            })
     
-    # 进一步降低处理帧率（5FPS）
-    processed_frames = []
-    emotions_report = {}
-    
-    for i, frame in enumerate(clip.iter_frames(fps=5)):  # 降帧处理
-        frame = cv2.resize(frame, (640, 360))  # 降低分辨率
-        emotions = detect_emotion_fast(frame)
-        
-        # 统计情绪
-        for emotion in emotions:
-            emotions_report[emotion] = emotions_report.get(emotion, 0) + 1
-        
-        # 只保留每5帧的1帧用于输出视频（进一步加速）
-        if i % 5 == 0:
-            marked_frame = frame.copy()
-            for (x, y, w, h), emotion in zip(
-                face_cascade.detectMultiScale(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)),
-                emotions
-            ):
-                color = {"开心": (0,255,0), "兴奋": (0,255,255), "难受": (0,0,255)}.get(emotion, (255,255,255))
-                cv2.rectangle(marked_frame, (x,y), (x+w,y+h), color, 2)
-                cv2.putText(marked_frame, emotion, (x,y-10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-            processed_frames.append(marked_frame)
-    
-    # 生成简短视频结果（1FPS）
-    if processed_frames:
-        from moviepy.video.io.ImageSequenceClip import ImageSequenceClip
-        output_clip = ImageSequenceClip(processed_frames, fps=1)
-        output_path = "output.mp4"
-        output_clip.write_videofile(output_path, codec="libx264", audio=False)
-    else:
-        output_path = None
-    
-    # 生成情绪报告文本
-    report_text = "，".join([f"{count}人{emotion}" for emotion, count in emotions_report.items()])
-    
-    return output_path, report_text
+    except Exception as e:
+        st.error(f"处理失败: {str(e)}")
+        if temp_path and os.path.exists(temp_path):
+            os.unlink(temp_path)
+
+def delete_file(index):
+    """删除指定文件"""
+    if st.session_state.uploaded_files[index]["temp_path"] and os.path.exists(st.session_state.uploaded_files[index]["temp_path"]):
+        os.unlink(st.session_state.uploaded_files[index]["temp_path"])
+    st.session_state.uploaded_files.pop(index)
+    st.rerun()
 
 def main():
     st.set_page_config(page_title="极速情绪检测", layout="centered")
-    st.title("⚡ 10秒情绪快检")
+    st.title("📸⚡ 媒体情绪快检")
     
-    uploaded_file = st.file_uploader("上传视频（MP4/AVI，建议10秒内）", type=["mp4", "avi"])
+    # 文件上传区
+    uploaded_file = st.file_uploader(
+        "上传图片或视频（JPG/PNG/MP4）",
+        type=["jpg", "png", "jpeg", "mp4"],
+        accept_multiple_files=False,
+        key="file_uploader"
+    )
     
-    if uploaded_file:
-        if st.button("开始极速分析"):
-            with st.spinner("10秒快速分析中..."):
-                output_path, report_text = process_video_fast(uploaded_file)
+    if uploaded_file and uploaded_file not in [f["name"] for f in st.session_state.uploaded_files]:
+        process_media(uploaded_file)
+        st.rerun()
+    
+    # 结果显示区
+    for i, file in enumerate(st.session_state.uploaded_files):
+        with st.container(border=True):
+            col1, col2 = st.columns([0.9, 0.1])
+            with col1:
+                st.subheader(f"📌 {file['name']}")
                 
-            st.success("分析完成！")
-            st.markdown(f"**检测结果**: {report_text}")
+                if file["type"] == "image":
+                    # 图片显示
+                    st.image(file["data"], caption="上传图片")
+                    emotions_text = "，".join(file["emotions"]) if file["emotions"] else "未检测到人脸"
+                    st.markdown(f"**情绪分析**: {emotions_text}")
+                
+                else:
+                    # 视频显示
+                    st.video(file["data"])
+                    emotions_text = "，".join([f"{count}人{emotion}" for emotion, count in file["emotions"].items()])
+                    st.markdown(f"**情绪统计**: {emotions_text}")
             
-            if output_path:
-                st.video(output_path)
-                with open(output_path, "rb") as f:
-                    st.download_button("下载快检视频", f, "emotion_preview.mp4")
+            with col2:
+                # 删除按钮
+                st.button("🗑️", key=f"del_{i}", on_click=delete_file, args=(i,), 
+                         help="删除此文件")
 
 if __name__ == "__main__":
     main()
