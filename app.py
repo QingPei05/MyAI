@@ -81,37 +81,6 @@ def draw_detections(img, emotions, faces):
     
     return output_img
 
-def show_emotion_stats(emotions):
-    """Display emotion statistics with visualization"""
-    if not emotions:
-        return
-    
-    st.subheader("📊 Emotion Distribution")
-    emotion_count = {
-        "Happy": emotions.count("happy"),
-        "Neutral": emotions.count("neutral"),
-        "Sad": emotions.count("sad"),
-        "Angry": emotions.count("angry")
-    }
-    
-    # Create dataframe for visualization
-    df = pd.DataFrame.from_dict(emotion_count, orient='index', columns=['Count'])
-    df = df[df['Count'] > 0]  # Only show detected emotions
-    
-    if not df.empty:
-        col1, col2 = st.columns([1, 2])
-        with col1:
-            st.dataframe(df, use_container_width=True)
-        
-        with col2:
-            fig, ax = plt.subplots()
-            df.plot(kind='bar', ax=ax, color=['#4CAF50', '#FFC107', '#F44336', '#FF9800'])
-            ax.set_title("Emotion Distribution")
-            ax.set_ylabel("Number of Faces")
-            st.pyplot(fig)
-    else:
-        st.warning("No emotions detected")
-
 def show_detection_guide():
     """Show detection guide in expandable section"""
     with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
@@ -161,9 +130,6 @@ def main():
                     for emo in emotions:
                         result.append(f"{emo.capitalize()}")
                     st.success(f"Detected {len(faces)} face(s): " + ", ".join(result))
-                    
-                    # Show statistics
-                    show_emotion_stats(emotions)
                     
                     # Show detection guide
                     show_detection_guide()
