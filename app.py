@@ -2,148 +2,118 @@ import cv2
 import numpy as np
 import streamlit as st
 from PIL import Image
-import tempfile
-from moviepy.editor import VideoFileClip
 
-# 初始化检测器
+# Initialize detectors with more accurate parameters
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
 smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
+eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
 
 def detect_emotion(frame):
-    """分析单帧图像的情绪（返回详细结果和标记后的图像）"""
+    """Analyze single frame for emotions with improved detection"""
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+    # Improved face detection parameters
+    faces = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=1.1,
+        minNeighbors=5,
+        minSize=(30, 30),
+        flags=cv2.CASCADE_SCALE_IMAGE
+    )
     
-    results = []
-    marked_img = frame.copy()
-    
+    emotions = []
     for (x, y, w, h) in faces:
         roi_gray = gray[y:y+h, x:x+w]
         
-        # 检测面部特征
-        smiles = smile_cascade.detectMultiScale(roi_gray, scaleFactor=1.8, minNeighbors=20)
-        eyes = eye_cascade.detectMultiScale(roi_gray)
+        # Improved feature detection
+        smiles = smile_cascade.detectMultiScale(
+            roi_gray,
+            scaleFactor=1.8,
+            minNeighbors=20,
+            minSize=(25, 25)
+        )
         
-        # 高级情绪判断逻辑
-        emotion = "neutral"
-        if len(smiles) > 0:
-            smile_conf = len(smiles) / (w * h) * 1000  # 微笑密度
-            if smile_conf > 0.5:
-                emotion = "excited"
+        eyes = eye_cascade.detectMultiScale(
+            roi_gray,
+            scaleFactor=1.1,
+            minNeighbors=5,
+            minSize=(20, 20)
+        )
+        
+        # Enhanced emotion logic
+        if len(smiles) > 2:  # Reduced threshold for better detection
+            if w > 100 and h > 100:  # Only count if face is reasonably large
+                emotions.append("excited")
+        elif len(smiles) > 0:
+            emotions.append("happy")
+        elif len(eyes) == 2:  # Exactly two eyes often indicates neutral
+            eye_centers = [y + ey + eh/2 for (ex, ey, ew, eh) in eyes]
+            avg_eye_height = sum(eye_centers) / len(eye_centers)
+            if avg_eye_height / h > 0.4:  # Adjusted eye position threshold
+                emotions.append("sad")
             else:
-                emotion = "happy"
-        elif len(eyes) > 0:
-            eye_pos = eyes[0][1] / h  # 眼睛相对位置
-            if eye_pos < 0.3:
-                emotion = "sad"
-            elif eye_pos > 0.7:
-                emotion = "surprised"
-        
-        # 绘制检测框和标签
-        color = {
-            "excited": (0, 255, 255),  # 黄色
-            "happy": (0, 255, 0),      # 绿色
-            "sad": (255, 0, 0),        # 蓝色
-            "surprised": (255, 0, 255),# 粉色
-            "neutral": (255, 255, 0)   # 青色
-        }.get(emotion, (255, 255, 255))
-        
-        cv2.rectangle(marked_img, (x, y), (x+w, y+h), color, 2)
-        cv2.putText(marked_img, f"{emotion}", (x, y-10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-        
-        results.append({
-            "position": [int(x), int(y), int(w), int(h)],
-            "emotion": emotion,
-            "confidence": {
-                "smile_density": len(smiles) / (w * h) if len(smiles) > 0 else 0,
-                "eye_position": eyes[0][1] / h if len(eyes) > 0 else 0.5
-            }
-        })
+                emotions.append("neutral")
+        else:
+            emotions.append("neutral")
     
-    return marked_img, results
+    return emotions, faces
 
-def process_uploaded_file(uploaded_file):
-    """自动处理上传的图片或视频"""
-    file_type = uploaded_file.type.split('/')[0]
+def process_uploaded_image(uploaded_file):
+    """Process uploaded image only"""
+    image = Image.open(uploaded_file)
+    img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+    emotions, faces = detect_emotion(img)
     
-    if file_type == "image":
-        # 处理图片
-        image = Image.open(uploaded_file)
-        img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-        marked_img, results = detect_emotion(img)
-        
-        # 显示结果
-        col1, col2 = st.columns(2)
-        with col1:
-            st.image(image, caption="原始图片", use_column_width=True)
-        with col2:
-            st.image(marked_img, channels="BGR", caption="分析结果", use_column_width=True)
-        
-        # 显示详细情绪数据
-        st.subheader("情绪分析报告")
-        for i, result in enumerate(results):
-            st.markdown(f"""
-            **人脸 {i+1}**  
-            - 情绪: `{result['emotion']}`  
-            - 位置: `{result['position']}`  
-            - 微笑强度: `{result['confidence']['smile_density']:.2f}`  
-            - 眼睛位置: `{result['confidence']['eye_position']:.2f}`
-            """)
+    # Emotion statistics
+    emotion_count = {}
+    for e in emotions:
+        emotion_count[e] = emotion_count.get(e, 0) + 1
     
-    elif file_type == "video":
-        # 处理视频
-        st.warning("视频处理可能需要较长时间，请耐心等待...")
-        
-        # 保存临时文件
-        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp4") as tmp:
-            tmp.write(uploaded_file.read())
-            input_path = tmp.name
-        
-        # 处理视频并显示进度
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        def process_frame(frame):
-            marked_frame, _ = detect_emotion(frame)
-            progress = min((frame_count / total_frames), 1.0)
-            progress_bar.progress(progress)
-            status_text.text(f"已处理 {frame_count}/{total_frames} 帧...")
-            return marked_frame
-        
-        clip = VideoFileClip(input_path)
-        total_frames = int(clip.fps * clip.duration)
-        frame_count = 0
-        
-        processed_clip = clip.fl_image(lambda f: process_frame(f))
-        output_path = "output.mp4"
-        processed_clip.write_videofile(output_path, codec="libx264", audio=False)
-        
-        # 显示结果
-        st.success("处理完成！")
-        st.video(output_path)
-        
-        # 提供下载
-        with open(output_path, "rb") as f:
-            st.download_button(
-                label="下载结果视频",
-                data=f,
-                file_name="emotion_analysis.mp4"
-            )
+    # Layout with normal-sized text
+    col1, col2 = st.columns([1, 2])
+    
+    with col1:
+        st.subheader("情绪统计")
+        if emotion_count:
+            result_text = "，".join([f"{count}人{emotion}" for emotion, count in emotion_count.items()])
+            st.success(f"**检测结果**: {result_text}")
+        else:
+            st.warning("未检测到人脸")
+    
+    with col2:
+        tab1, tab2 = st.tabs(["原始图片", "分析结果"])
+        with tab1:
+            st.image(image, use_column_width=True)
+        with tab2:
+            marked_img = img.copy()
+            for (x, y, w, h), emotion in zip(faces, emotions):
+                color = {
+                    "happy": (0, 255, 0),      # Green
+                    "excited": (0, 255, 255),  # Yellow
+                    "sad": (255, 0, 0),        # Red
+                    "neutral": (255, 255, 0)   # Cyan
+                }.get(emotion, (255, 255, 255))
+                
+                # Draw rectangle
+                cv2.rectangle(marked_img, (x, y), (x+w, y+h), color, 2)
+                
+                # Draw emotion text with normal size
+                cv2.putText(marked_img, emotion, (x, y-5),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            
+            st.image(marked_img, channels="BGR", use_column_width=True)
 
 def main():
-    st.set_page_config(page_title="智能情绪检测", layout="wide")
-    st.title("🤖 AI情绪分析系统")
+    st.set_page_config(page_title="情绪检测系统", layout="centered")
+    st.title("📊 情绪分析报告")
     
     uploaded_file = st.file_uploader(
-        "上传图片或视频（支持JPG/PNG/MP4）", 
-        type=["jpg", "png", "jpeg", "mp4"],
-        accept_multiple_files=False
+        "上传图片（JPG/PNG）", 
+        type=["jpg", "png", "jpeg"],
+        key="file_uploader"
     )
     
     if uploaded_file:
-        process_uploaded_file(uploaded_file)
+        process_uploaded_image(uploaded_file)
 
 if __name__ == "__main__":
     main()
