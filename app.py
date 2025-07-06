@@ -35,7 +35,7 @@ def detect_emotion(img):
     return emotions, faces
 
 def draw_detections(img, emotions, faces):
-    """在图像上绘制检测结果（调整字体大小为12px左右）"""
+    """在图像上绘制检测结果（字体大小调整为12px效果）"""
     for (x,y,w,h), emotion in zip(faces, emotions):
         # 人脸框颜色根据情绪变化
         color = {
@@ -46,7 +46,7 @@ def draw_detections(img, emotions, faces):
         
         cv2.rectangle(img, (x,y), (x+w,y+h), color, 2)
         cv2.putText(img, emotion, (x, y-10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)  # 调整为0.6对应约12px
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)  # 0.6对应约12px
     
     return img
 
@@ -70,7 +70,7 @@ def main():
             col1, col2 = st.columns([1, 2])
             
             with col1:
-                # 情绪统计结果
+                # 情绪统计结果（纯文字）
                 st.subheader("检测结果")
                 if emotions:
                     emotion_count = {
@@ -79,25 +79,20 @@ def main():
                         "伤心": emotions.count("sad")
                     }
                     
-                    result_parts = []
+                    result_text = []
                     if emotion_count["开心"] > 0:
-                        result_parts.append(f"{emotion_count['开心']}人开心")
+                        result_text.append(f"{emotion_count['开心']}人开心")
                     if emotion_count["平静"] > 0:
-                        result_parts.append(f"{emotion_count['平静']}人平静")
+                        result_text.append(f"{emotion_count['平静']}人平静")
                     if emotion_count["伤心"] > 0:
-                        result_parts.append(f"{emotion_count['伤心']}人伤心")
+                        result_text.append(f"{emotion_count['伤心']}人伤心")
                     
-                    st.success("，".join(result_parts))
-                    
-                    # 情绪分布图表
-                    st.markdown("---")
-                    st.markdown("**情绪分布**")
-                    st.bar_chart(emotion_count)
+                    st.success("，".join(result_text))
                 else:
                     st.warning("未检测到人脸")
             
             with col2:
-                # 使用选项卡显示图片
+                # 显示图片（默认原始图，可切换分析结果）
                 tab1, tab2 = st.tabs(["原始图片", "分析结果"])
                 with tab1:
                     st.image(image, use_container_width=True)
