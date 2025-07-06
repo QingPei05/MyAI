@@ -46,7 +46,7 @@ def draw_detections(img, emotions, faces):
         
         cv2.rectangle(img, (x,y), (x+w,y+h), color, 2)
         cv2.putText(img, emotion, (x, y-10), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)  # 减小字体大小
     
     return img
 
@@ -66,35 +66,43 @@ def main():
             emotions, faces = detect_emotion(img)
             detected_img = draw_detections(img.copy(), emotions, faces)
             
-            # 显示结果
-            col1, col2 = st.columns(2)
-            with col1:
-                st.image(image, caption="原始图片", use_container_width=True)
-            with col2:
-                st.image(detected_img, channels="BGR", caption="分析结果", use_container_width=True)
+            # 使用选项卡显示图片
+            tab1, tab2 = st.tabs(["原始图片", "分析结果"])
             
-            # 情绪统计输出
-            st.subheader("检测结果")
+            with tab1:
+                st.image(image, use_container_width=True)
+            
+            with tab2:
+                st.image(detected_img, channels="BGR", use_container_width=True)
+            
+            # 右侧显示情绪统计结果
+            st.sidebar.subheader("情绪统计")
             if emotions:
                 # 统计每种情绪的人数
                 emotion_count = {
-                    "happy": emotions.count("happy"),
-                    "neutral": emotions.count("neutral"),
-                    "sad": emotions.count("sad")
+                    "开心": emotions.count("happy"),
+                    "平静": emotions.count("neutral"),
+                    "伤心": emotions.count("sad")
                 }
                 
                 # 生成简洁的输出文本
                 result_parts = []
-                if emotion_count["happy"] > 0:
-                    result_parts.append(f"{emotion_count['happy']}人开心")
-                if emotion_count["neutral"] > 0:
-                    result_parts.append(f"{emotion_count['neutral']}人平静")
-                if emotion_count["sad"] > 0:
-                    result_parts.append(f"{emotion_count['sad']}人伤心")
+                if emotion_count["开心"] > 0:
+                    result_parts.append(f"{emotion_count['开心']}人开心")
+                if emotion_count["平静"] > 0:
+                    result_parts.append(f"{emotion_count['平静']}人平静")
+                if emotion_count["伤心"] > 0:
+                    result_parts.append(f"{emotion_count['伤心']}人伤心")
                 
-                st.success("，".join(result_parts))
+                st.sidebar.success("，".join(result_parts))
+                
+                # 添加简单的情绪分布饼图
+                if sum(emotion_count.values()) > 0:
+                    st.sidebar.markdown("---")
+                    st.sidebar.markdown("**情绪分布**")
+                    st.sidebar.bar_chart(emotion_count)
             else:
-                st.warning("未检测到人脸")
+                st.sidebar.warning("未检测到人脸")
                 
         except Exception as e:
             st.error(f"处理错误: {str(e)}")
