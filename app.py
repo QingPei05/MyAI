@@ -81,15 +81,30 @@ def draw_detections(img, emotions, faces):
     
     return output_img
 
-def show_detection_guide():
+def show_detection_guide(show_full_guide=True):
     """Show detection guide in expandable section"""
-    with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
-        st.markdown("""
-        **Tips for Better Results:**
-        - Use clear, front-facing images
-        - Ensure good lighting
-        - Avoid obstructed faces
-        """)
+    with st.expander("ℹ How Emotion Detection Works", expanded=False):
+        if show_full_guide:
+            st.markdown("""
+            *Detection Logic Explained:*
+            
+            - 😊 *Happy*: Detected when smile is present
+            - 😠 *Angry*: Detected when eyes are wide open and positioned in upper face
+            - 😐 *Neutral*: Default state when no strong indicators found
+            - 😢 *Sad*: Detected when eyes are positioned higher than normal
+            
+            *Tips for Better Results:*
+            - Use clear, front-facing images
+            - Ensure good lighting
+            - Avoid obstructed faces
+            """)
+        else:
+            st.markdown("""
+            *Tips for Better Results:*
+            - Use clear, front-facing images
+            - Ensure good lighting
+            - Avoid obstructed faces
+            """)
 
 def main():
     st.set_page_config(
@@ -129,11 +144,13 @@ def main():
                         result_parts.append(f"{count} {emo.capitalize()}")
                     
                     st.success(f"🎭 Detected {len(faces)} face(s): " + ", ".join(result_parts))
+                    
+                    # Show full detection guide
+                    show_detection_guide(show_full_guide=True)
                 else:
                     st.warning("No faces detected")
-                
-                # Always show detection guide (moved outside the if-else block)
-                show_detection_guide()
+                    # Show only tips when no faces detected
+                    show_detection_guide(show_full_guide=False)
             
             with col2:
                 tab1, tab2 = st.tabs(["Original Image", "Analysis Result"])
