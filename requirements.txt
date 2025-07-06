@@ -1,31 +1,6 @@
-# ===== 核心依赖 =====
-streamlit==1.22.0
-numpy==1.23.5
-pandas==1.5.3
-Pillow==9.4.0
-
-# ===== 图像/视频处理 =====
-opencv-python-headless==4.7.0.72
-imageio==2.31.1
-imageio-ffmpeg==0.4.8
+streamlit==1.32.0
+opencv-python-headless==4.9.0.80
+numpy==1.26.4
+Pillow==10.1.0
 moviepy==1.0.3
-decorator==5.1.1
-
-# ===== 机器学习扩展 =====
-tensorflow==2.12.0
-scikit-learn==1.2.2
-keras==2.12.0  # TensorFlow兼容版本
-
-# ===== 数据可视化 =====
-matplotlib==3.7.1
-seaborn==0.12.2
-plotly==5.14.1  # 交互式图表
-
-# ===== 实用工具 =====
-tqdm==4.65.0
-python-dotenv==1.0.0
-protobuf==3.20.3  # 解决TensorFlow的protobuf冲突
-
-# ===== 环境保障 =====
-setuptools==65.5.0
-wheel==0.38.4
+imageio==2.34.0
