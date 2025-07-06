@@ -35,6 +35,44 @@ def detect_emotion(frame):
     
     return emotions
 
+def process_frame(frame):
+    """处理单帧图像并返回标记后的图像"""
+    emotions = detect_emotion(frame)
+    marked_img = frame.copy()
+    
+    for (x, y, w, h), emotion in zip(
+        face_cascade.detectMultiScale(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)),
+        emotions
+    ):
+        color = {
+            "happy": (0, 255, 0),      # 绿色
+            "excited": (0, 255, 255),  # 黄色
+            "sad": (0, 0, 255),        # 红色
+            "neutral": (255, 255, 0)   # 青色
+        }.get(emotion, (255, 255, 255))
+        cv2.rectangle(marked_img, (x, y), (x+w, y+h), color, 2)
+        cv2.putText(marked_img, emotion, (x, y-10),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+    return marked_img
+
+def process_video(video_path):
+    """处理视频文件"""
+    cap = cv2.VideoCapture(video_path)
+    stframe = st.empty()
+    stop_button = st.button("停止处理")
+    
+    while cap.isOpened() and not stop_button:
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        marked_frame = process_frame(frame)
+        stframe.image(marked_frame, channels="BGR")
+        
+    cap.release()
+    if stop_button:
+        st.warning("视频处理已中断")
+
 def process_uploaded_file(uploaded_file):
     """自动处理上传的图片或视频"""
     file_type = uploaded_file.type.split('/')[0]
@@ -67,21 +105,17 @@ def process_uploaded_file(uploaded_file):
             with tab1:
                 st.image(image, use_container_width=True)
             with tab2:
-                marked_img = img.copy()
-                for (x, y, w, h), emotion in zip(
-                    face_cascade.detectMultiScale(cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)),
-                    emotions
-                ):
-                    color = {
-                        "happy": (0, 255, 0),      # 绿色
-                        "excited": (0, 255, 255),  # 黄色
-                        "sad": (0, 0, 255),        # 红色
-                        "neutral": (255, 255, 0)   # 青色
-                    }.get(emotion, (255, 255, 255))
-                    cv2.rectangle(marked_img, (x, y), (x+w, y+h), color, 2)
-                    cv2.putText(marked_img, emotion, (x, y-10),  # 添加英文情绪标签
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+                marked_img = process_frame(img)
                 st.image(marked_img, channels="BGR", use_container_width=True)
+    
+    elif file_type == "video":
+        # 处理视频
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmpfile:
+            tmpfile.write(uploaded_file.read())
+            video_path = tmpfile.name
+        
+        st.info("视频处理中...")
+        process_video(video_path)
 
 def main():
     st.set_page_config(page_title="情绪检测系统", layout="centered")
