@@ -31,15 +31,13 @@ def detect_emotion(img):
             roi_gray,
             scaleFactor=1.7,
             minNeighbors=25,
-            minSize=(40, 40)
-        )
+            minSize=(40, 40）)
         
         eyes = eye_cascade.detectMultiScale(
             roi_gray,
             scaleFactor=1.1,
             minNeighbors=8,
             minSize=(45, 45))
-        )
         
         # 多维度情绪判断
         emotion = "平静"
