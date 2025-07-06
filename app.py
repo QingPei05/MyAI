@@ -3,92 +3,109 @@ import numpy as np
 import streamlit as st
 from PIL import Image
 
-# 加载预训练模型（使用更精确的参数）
+# 加载预训练模型（使用更可靠的参数）
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
 smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
 
 def detect_emotion(img):
-    """增强版情绪检测（快乐、平静、悲伤、愤怒）"""
+    """更可靠的情绪检测（快乐、平静、悲伤、愤怒）"""
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    # 提高人脸检测精度
+    # 优化的人脸检测参数
     faces = face_cascade.detectMultiScale(
         gray,
-        scaleFactor=1.1,  # 更精细的缩放
-        minNeighbors=7,   # 更高的邻居阈值
-        minSize=(100, 100) # 最小人脸尺寸
+        scaleFactor=1.05,  # 更精细的缩放
+        minNeighbors=8,    # 更高的邻居阈值
+        minSize=(120, 120), # 最小人脸尺寸
+        flags=cv2.CASCADE_SCALE_IMAGE
     )
     
     emotions = []
+    valid_faces = []
     for (x,y,w,h) in faces:
+        # 确保人脸区域有效
+        if w < 50 or h < 50:  # 忽略过小的人脸
+            continue
+            
         roi_gray = gray[y:y+h, x:x+w]
+        valid_faces.append((x,y,w,h))
         
-        # 检测微笑（提高检测精度）
+        # 更可靠的微笑检测
         smiles = smile_cascade.detectMultiScale(
             roi_gray,
-            scaleFactor=1.8,
-            minNeighbors=25,  # 更高的阈值减少误检
-            minSize=(25, 25)
+            scaleFactor=1.7,
+            minNeighbors=22,
+            minSize=(35, 35)
         )
         
-        # 检测眼睛（提高检测精度）
+        # 更可靠的眼睛检测
         eyes = eye_cascade.detectMultiScale(
             roi_gray,
-            scaleFactor=1.1,
+            scaleFactor=1.05,
             minNeighbors=5,
-            minSize=(30, 30)
+            minSize=(40, 40)
         )
         
         # 增强的情绪判断逻辑
         emotion = "平静"  # 默认
         
-        # 眼睛特征分析
-        if len(eyes) >= 2:  # 确保检测到两只眼睛
-            eye1, eye2 = eyes[0], eyes[1]
-            eye_center_y = (eye1[1] + eye2[1]) / 2  # 眼睛中心平均高度
-            eye_openness = (eye1[3] + eye2[3]) / 2  # 眼睛睁开程度
+        # 眼睛特征分析（确保有两只眼睛）
+        if len(eyes) >= 2:
+            eye_centers = [y + ey + eh/2 for (ex,ey,ew,eh) in eyes[:2]]  # 只取前两个眼睛
+            avg_eye_height = sum(eye_centers) / len(eye_centers)
             
-            # 愤怒判断（眼睛睁大且位置正常）
-            if eye_openness > h/6 and eye_center_y < h/3:
+            # 愤怒判断（眼睛睁开程度）
+            eye_openness = sum([eh for (ex,ey,ew,eh) in eyes[:2]]) / 2
+            if eye_openness > h/5 and avg_eye_height < h/2.3:
                 emotion = "愤怒"
-            # 悲伤判断（眼睛位置偏低）
-            elif eye_center_y > h/2.5:
+            # 悲伤判断
+            elif avg_eye_height > h/2.3:
                 emotion = "悲伤"
         
         # 快乐判断（优先判断）
         if len(smiles) > 0:
-            (sx,sy,sw,sh) = smiles[0]
-            if sw/w > 0.3:  # 笑容宽度占脸宽比例
+            (sx,sy,sw,sh) = max(smiles, key=lambda s: s[2])  # 取最大笑容
+            if sw > w/3:  # 笑容宽度阈值
                 emotion = "快乐"
         
         emotions.append(emotion)
     
-    return emotions, faces
+    return emotions, valid_faces
 
 def draw_detections(img, emotions, faces):
-    """在图像上绘制检测结果（4种情绪颜色标记）"""
+    """确保标签显示的绘制方法"""
+    output_img = img.copy()
     for (x,y,w,h), emotion in zip(faces, emotions):
-        # 4种情绪的颜色映射
+        # 颜色映射
         color_map = {
-            "快乐": (0, 255, 0),    # 绿色
-            "平静": (255, 255, 0),  # 黄色
-            "悲伤": (0, 0, 255),    # 红色
-            "愤怒": (0, 100, 255)   # 橙色
+            "快乐": (0, 200, 0),    # 更柔和的绿色
+            "平静": (200, 200, 0),  # 更柔和的黄色
+            "悲伤": (0, 0, 200),    # 更柔和的红色
+            "愤怒": (0, 120, 255)   # 更醒目的橙色
         }
-        color = color_map.get(emotion, (255,255,255))
+        color = color_map.get(emotion, (200,200,200))
         
-        # 绘制人脸框和标签（保持大字体）
-        cv2.rectangle(img, (x,y), (x+w,y+h), color, 3)
-        cv2.putText(img, emotion, (x, y-15), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+        # 绘制带背景的文本（确保可见性）
+        text_size = cv2.getTextSize(emotion, cv2.FONT_HERSHEY_SIMPLEX, 0.8, 2)[0]
+        cv2.rectangle(output_img, 
+                     (x, y-35), 
+                     (x + text_size[0] + 10, y-5), 
+                     color, -1)  # 文本背景
+        cv2.putText(output_img, emotion, 
+                   (x+5, y-15), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, 
+                   (255,255,255), 2)  # 白色文字
+        
+        # 绘制人脸框
+        cv2.rectangle(output_img, (x,y), (x+w,y+h), color, 3)
     
-    return img
+    return output_img
 
 def main():
-    st.set_page_config(page_title="精准情绪检测", layout="wide")
-    st.title("😊 精准情绪检测")
+    st.set_page_config(page_title="高精度情绪检测", layout="wide")
+    st.title("😊 高精度情绪检测")
     
-    uploaded_file = st.file_uploader("上传图片（JPG/PNG）", type=["jpg", "png"])
+    uploaded_file = st.file_uploader("上传清晰正脸照片（JPG/PNG）", type=["jpg", "png"])
     
     if uploaded_file:
         try:
@@ -104,45 +121,43 @@ def main():
             col1, col2 = st.columns([1, 2])
             
             with col1:
-                # 情绪统计结果
                 st.subheader("检测结果")
                 if emotions:
                     emotion_count = {
-                        "开心": emotions.count("快乐"),
+                        "快乐": emotions.count("快乐"),
                         "平静": emotions.count("平静"),
-                        "伤心": emotions.count("悲伤"),
+                        "悲伤": emotions.count("悲伤"),
                         "愤怒": emotions.count("愤怒")
                     }
                     
-                    # 按固定顺序输出
-                    result_parts = []
-                    for emotion, count in emotion_count.items():
-                        if count > 0:
-                            result_parts.append(f"{count}人{emotion}")
+                    result = []
+                    for emo, cnt in emotion_count.items():
+                        if cnt > 0:
+                            result.append(f"{cnt}人{emo}")
+                    st.success("，".join(result))
                     
-                    st.success("，".join(result_parts))
-                    
-                    # 添加准确度提示
                     st.markdown("---")
-                    st.info("""
-                    **准确度提示**：
-                    - 正脸照片效果最佳
-                    - 保持面部清晰可见
-                    - 避免强烈侧光
+                    st.markdown("**优化说明**：")
+                    st.write("""
+                    - 采用更严格的人脸检测参数
+                    - 情绪标签现在带有背景框
+                    - 优化了愤怒和悲伤的判断逻辑
                     """)
                 else:
-                    st.warning("未检测到人脸")
+                    st.warning("未检测到有效人脸，请上传更清晰的正脸照片")
             
             with col2:
                 # 图片显示
                 tab1, tab2 = st.tabs(["原始图片", "分析结果"])
                 with tab1:
-                    st.image(image, use_container_width=True)
+                    st.image(image, use_container_width=True, caption="上传的原始图片")
                 with tab2:
-                    st.image(detected_img, channels="BGR", use_container_width=True)
+                    st.image(detected_img, channels="BGR", use_container_width=True, 
+                           caption=f"检测到 {len(faces)} 个人脸")
                 
         except Exception as e:
-            st.error(f"处理错误: {str(e)}")
+            st.error(f"图片处理失败: {str(e)}")
+            st.info("请尝试上传不同角度或更清晰的照片")
 
 if __name__ == "__main__":
     main()
