@@ -42,46 +42,38 @@ def detect_emotion(frame):
         
         eye_count = len(eyes)
         smile_count = len(smiles)
-        eye_positions = [eye[1] for eye in eyes] if eye_count > 0 else []
-        avg_eye_position = sum(eye_positions)/len(eye_positions) if eye_positions else 0
+        eye_sizes = [e[2] for e in eyes] if eye_count > 0 else [0]
+        avg_eye_size = np.mean(eye_sizes) if eye_sizes else 0
         
-        # 精确的多层次情绪判断
+        # 精确的情绪判断逻辑
         if smile_count > 3:
-            if eye_count > 1 and avg_eye_position < h * 0.3:
-                emotions.append("爱")
-            else:
-                emotions.append("快乐")
+            emotions.append("快乐")
         elif smile_count > 1:
-            if eye_count > 1 and any(e[3] > h * 0.25 for e in eyes):  # 大眼睛
+            if eye_count >= 2 and avg_eye_size > h * 0.2:
                 emotions.append("兴奋")
             else:
                 emotions.append("满足")
         elif smile_count > 0:
             emotions.append("平静")
-        elif eye_count > 1:
-            if avg_eye_position > h * 0.6:
-                if all(e[3] < h * 0.2 for e in eyes):  # 小眼睛
-                    emotions.append("悲伤")
-                else:
-                    emotions.append("羞愧")
-            elif avg_eye_position < h * 0.3:
+        elif eye_count >= 2:
+            if any(e[1] > h * 0.6 for e in eyes):  # 眼睛位置低
+                emotions.append("悲伤")
+            elif any(e[1] < h * 0.3 for e in eyes):  # 眼睛位置高
                 if w > h * 0.85:  # 宽脸
                     emotions.append("愤怒")
                 else:
-                    emotions.append("嫉妒")
+                    emotions.append("骄傲")
             else:
-                if any(e[3] > h * 0.25 for e in eyes):  # 大眼睛
-                    emotions.append("恐惧")
+                if avg_eye_size > h * 0.22:  # 大眼睛
+                    emotions.append("惊讶")
                 else:
-                    emotions.append("焦虑")
-        elif eye_count == 1:
-            emotions.append("尴尬")
+                    emotions.append("中性")
         else:
-            # 无特征时的保守判断
+            # 根据脸部特征判断
             if w > h * 0.85:  # 宽脸
-                emotions.append("骄傲")
+                emotions.append("愤怒")
             elif h > w * 1.4:  # 长脸
-                emotions.append("内疚")
+                emotions.append("悲伤")
             else:
                 emotions.append("中性")
     
@@ -92,27 +84,16 @@ def process_frame(frame):
     emotions = detect_emotion(frame)
     marked_img = frame.copy()
     
-    # 完整的情绪颜色映射
+    # 精简后的情绪颜色映射
     emotion_colors = {
         "快乐": (0, 255, 0),      # 绿色
         "悲伤": (0, 0, 255),      # 红色
-        "愤怒": (0, 0, 139),     # 深红色
-        "恐惧": (255, 0, 0),     # 蓝色
-        "厌恶": (139, 0, 139),   # 紫色
-        "惊讶": (255, 255, 0),   # 青色
-        "爱": (255, 105, 180),  # 粉色
-        "内疚": (165, 42, 42),   # 棕色
-        "羞愧": (218, 165, 32),  # 金色
-        "尴尬": (255, 192, 203), # 粉红
+        "愤怒": (0, 0, 139),     # 深红
         "骄傲": (255, 215, 0),   # 金色
-        "羡慕": (50, 205, 50),   # 浅绿
-        "嫉妒": (34, 139, 34),   # 森林绿
-        "焦虑": (75, 0, 130),    # 靛蓝
         "兴奋": (255, 165, 0),   # 橙色
+        "满足": (60, 179, 113),  # 绿色
         "平静": (173, 216, 230), # 浅蓝
-        "怀旧": (186, 85, 211),  # 中紫
-        "同情": (0, 191, 255),   # 深天蓝
-        "满足": (60, 179, 113),  # 中海绿
+        "惊讶": (255, 255, 0),   # 青色
         "中性": (255, 255, 255)  # 白色
     }
     
@@ -122,17 +103,29 @@ def process_frame(frame):
     ):
         color = emotion_colors.get(emotion, (255, 255, 255))
         
-        # 绘制带背景的标签
-        label_size, _ = cv2.getTextSize(emotion, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2)
-        cv2.rectangle(marked_img, 
-                     (x, y - label_size[1] - 10), 
-                     (x + label_size[0], y), 
-                     color, cv2.FILLED)
-        cv2.putText(marked_img, emotion, (x, y-10),
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
-        
         # 绘制人脸框
         cv2.rectangle(marked_img, (x, y), (x+w, y+h), color, 2)
+        
+        # 在脸旁添加情绪标签（带背景）
+        label = f"{emotion}"
+        font_scale = 0.9 if w > 60 else 0.7
+        thickness = 2 if w > 60 else 1
+        
+        (label_width, label_height), baseline = cv2.getTextSize(
+            label, cv2.FONT_HERSHEY_SIMPLEX, font_scale, thickness)
+        
+        # 标签背景
+        cv2.rectangle(marked_img,
+                     (x, y - label_height - 10),
+                     (x + label_width, y),
+                     color, cv2.FILLED)
+        
+        # 标签文字
+        cv2.putText(marked_img, label,
+                   (x, y - 10),
+                   cv2.FONT_HERSHEY_SIMPLEX,
+                   font_scale, (0, 0, 0),  # 黑色文字
+                   thickness, cv2.LINE_AA)
     
     return marked_img
 
@@ -148,7 +141,7 @@ def process_video(video_path):
             break
             
         marked_frame = process_frame(frame)
-        stframe.image(marked_frame, channels="BGR")
+        stframe.image(marked_img, channels="BGR")
         
     cap.release()
     if stop_button:
@@ -172,7 +165,12 @@ def process_uploaded_file(uploaded_file):
         with col1:
             st.subheader("情绪统计")
             if emotion_count:
-                result_text = "，".join([f"{emotion}: {count}人" for emotion, count in emotion_count.items()])
+                # 中文情绪排序
+                emotion_order = ["快乐", "兴奋", "满足", "平静", "骄傲", 
+                                "惊讶", "中性", "悲伤", "愤怒"]
+                sorted_emotions = sorted(emotion_count.items(),
+                                       key=lambda x: emotion_order.index(x[0]) 
+                result_text = "\n".join([f"• {emotion}: {count}人" for emotion, count in sorted_emotions])
                 st.success(result_text)
             else:
                 st.warning("未检测到人脸")
@@ -180,10 +178,10 @@ def process_uploaded_file(uploaded_file):
         with col2:
             tab1, tab2 = st.tabs(["原始图片", "分析结果"])
             with tab1:
-                st.image(image, use_container_width=True)
+                st.image(image, use_column_width=True)
             with tab2:
                 marked_img = process_frame(img)
-                st.image(marked_img, channels="BGR", use_container_width=True)
+                st.image(marked_img, channels="BGR", use_column_width=True)
     
     elif file_type == "video":
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmpfile:
@@ -194,17 +192,24 @@ def process_uploaded_file(uploaded_file):
         process_video(video_path)
 
 def main():
-    st.set_page_config(page_title="情绪检测系统", layout="centered")
-    st.title("📊 情绪分析报告")
+    st.set_page_config(
+        page_title="高级情绪检测系统",
+        page_icon="😊",
+        layout="wide"
+    )
+    
+    st.title("😊 高级情绪分析报告")
+    st.caption("上传图片或视频进行多情绪检测分析")
     
     uploaded_file = st.file_uploader(
-        "上传图片或视频（JPG/PNG/MP4）", 
+        "选择图片或视频文件（JPG/PNG/MP4）",
         type=["jpg", "png", "jpeg", "mp4"],
-        key="file_uploader"
+        accept_multiple_files=False
     )
     
     if uploaded_file:
-        process_uploaded_file(uploaded_file)
+        with st.spinner("分析中，请稍候..."):
+            process_uploaded_file(uploaded_file)
 
 if __name__ == "__main__":
     main()
