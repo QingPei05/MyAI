@@ -1,8 +1,7 @@
 import cv2
 import numpy as np
 import streamlit as st
-from PIL import Image, ImageDraw, ImageFont  # 确保导入ImageDraw和ImageFont
-import os
+from PIL import Image, ImageDraw, ImageFont
 
 # 加载预训练模型
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
@@ -91,9 +90,13 @@ def draw_detections(img, emotions, faces):
         pil_img = Image.fromarray(cv2.cvtColor(output_img, cv2.COLOR_BGR2RGB))
         draw = ImageDraw.Draw(pil_img)
         
+        # 使用textbbox获取文本尺寸（兼容Pillow 9.0.0+）
+        text = emotion
+        bbox = draw.textbbox((0, 0), text, font=font)
+        text_width = bbox[2] - bbox[0]
+        text_height = bbox[3] - bbox[1]
+        
         # 绘制文本背景框
-        text = emotion  # 直接使用中文
-        text_width, text_height = draw.textsize(text, font=font)
         draw.rectangle(
             [(x, y - text_height - 10), (x + text_width + 10, y - 10)],
             fill=color,
@@ -106,7 +109,6 @@ def draw_detections(img, emotions, faces):
             text,
             font=font,
             fill=(255, 255, 255)  # 白色文字
-        )
         
         # 转换回OpenCV格式
         output_img = cv2.cvtColor(np.array(pil_img), cv2.COLOR_RGB2BGR)
