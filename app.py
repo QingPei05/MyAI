@@ -31,7 +31,6 @@ def detect_emotion(img):
             scaleFactor=1.8, 
             minNeighbors=20,
             minSize=(25, 25)
-        )
         eyes = eye_cascade.detectMultiScale(
             roi_gray,
             minSize=(30, 30))
@@ -213,7 +212,6 @@ def main():
             # Add download button for analyzed image
             if faces:
                 st.markdown("---")
-                analyzed_img = Image.fromarray(cv2.cvtColor(detected_img, cv2.COLOR_BGR2RGB))
                 st.download_button(
                     label="⬇️ Download Analyzed Image",
                     data=cv2.imencode('.jpg', detected_img)[1].tobytes(),
