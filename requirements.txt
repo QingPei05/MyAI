@@ -1,9 +1,27 @@
-streamlit>=1.22.0
-opencv-python-headless>=4.7.0.72
-numpy>=1.23.5
-Pillow>=9.4.0
-moviepy>=1.0.3
-matplotlib>=3.7.1
-pandas>=1.5.3
-scikit-learn>=1.2.2
-tqdm>=4.65.0
+# 核心库
+streamlit==1.22.0
+numpy==1.23.5
+pandas==1.5.3
+Pillow==9.4.0
+
+# 图像处理
+opencv-python-headless==4.7.0.72
+imageio==2.31.1
+imageio-ffmpeg==0.4.8
+
+# 视频处理
+moviepy==1.0.3
+decorator==5.1.1  # moviepy的隐式依赖
+
+# 数据可视化
+matplotlib==3.7.1
+seaborn==0.12.2  # 增强可视化选项
+
+# 实用工具
+tqdm==4.65.0     # 进度条
+tempfile==1.0.0   # 临时文件处理
+python-dotenv==1.0.0  # 环境变量管理
+
+# 兼容性保障
+setuptools==65.5.0
+wheel==0.38.4
