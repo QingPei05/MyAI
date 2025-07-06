@@ -70,7 +70,7 @@ def process_uploaded_file(uploaded_file):
             # 并排显示原图和分析结果
             tab1, tab2 = st.tabs(["原始图片", "分析结果"])
             with tab1:
-                st.image(image, use_column_width=True)
+                st.image(image, use_container_width=True)
             with tab2:
                 marked_img = img.copy()
                 for (x, y, w, h), emotion in zip(
