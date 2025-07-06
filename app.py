@@ -35,12 +35,12 @@ def detect_emotion(frame):
             scaleFactor=1.8, 
             minNeighbors=20,
             minSize=(25, 25)
-        )
+        
         eyes = eye_cascade.detectMultiScale(
             roi_gray,
             scaleFactor=1.1,
             minNeighbors=5,
-            minSize=(20, 20)
+            minSize=(20, 20))
         
         # 扩展的情绪判断逻辑
         eye_count = len(eyes)
