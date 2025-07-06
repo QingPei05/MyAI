@@ -87,9 +87,9 @@ def main():
             # Display results
             col1, col2 = st.columns(2)
             with col1:
-                st.image(image, caption="Original Image", use_column_width=True)
+                st.image(image, caption="Original Image", use_container_width=True)
             with col2:
-                st.image(detected_img, channels="BGR", caption="Analysis Result", use_column_width=True)
+                st.image(detected_img, channels="BGR", caption="Analysis Result", use_container_width=True)
             
             # Text results
             for i, result in enumerate(results):
