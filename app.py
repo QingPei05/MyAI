@@ -1,8 +1,8 @@
 import cv2
 import numpy as np
 import streamlit as st
-from PIL import Image
-# 加载预训练模型
+from PIL import Image, ImageDraw, ImageFont
+
 face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
 smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
