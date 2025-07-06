@@ -83,7 +83,7 @@ def draw_detections(img, emotions, faces):
 
 def show_detection_guide(show_full_guide=True):
     """Show detection guide in expandable section"""
-    with st.expander("ℹ How Emotion Detection Works", expanded=False):
+    with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
         if show_full_guide:
             st.markdown("""
             *Detection Logic Explained:*
