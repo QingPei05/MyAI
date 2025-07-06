@@ -102,10 +102,10 @@ def main():
     st.set_page_config(
         page_title="Emotion Detection System", 
         layout="wide",
-        page_icon="😊"
+        page_icon="🎭"
     )
     
-    st.title("😊 Emotion Detection")
+    st.title("🎭 Emotion Detection")
     
     uploaded_file = st.file_uploader("Upload Image (JPG/PNG)", type=["jpg", "png"])
     
@@ -135,7 +135,7 @@ def main():
                     for emo, count in emotion_count.items():
                         result_parts.append(f"{count} {emo.capitalize()}")
                     
-                    st.success(f"Detected {len(faces)} face(s): " + ", ".join(result_parts))
+                    st.success(f"🎭 Detected {len(faces)} face(s): " + ", ".join(result_parts))
                     
                     # Show detection guide
                     show_detection_guide()
