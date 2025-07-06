@@ -1,5 +1,6 @@
-streamlit==1.32.0          # Web应用框架
-opencv-python-headless==4.9.0.80  # 图像处理（无GUI版本）
-numpy==1.26.4             # 数值计算
-Pillow==10.1.0            # 图像加载和处理
-pyav==12.0.0            # 视频流处理（摄像头功能需要）
+streamlit==1.32.0
+opencv-python-headless==4.9.0.80
+numpy==1.26.4
+Pillow==10.1.0
+imageio[ffmpeg]==2.34.0
+moviepy==1.0.3
