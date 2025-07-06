@@ -169,7 +169,7 @@ def process_uploaded_file(uploaded_file):
                 emotion_order = ["快乐", "兴奋", "满足", "平静", "骄傲", 
                                 "惊讶", "中性", "悲伤", "愤怒"]
                 sorted_emotions = sorted(emotion_count.items(),
-                                       key=lambda x: emotion_order.index(x[0]) 
+                                       key=lambda x: emotion_order.index(x[0])) 
                 result_text = "\n".join([f"• {emotion}: {count}人" for emotion, count in sorted_emotions])
                 st.success(result_text)
             else:
