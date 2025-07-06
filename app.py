@@ -23,15 +23,31 @@ def detect_emotion(frame):
         smiles = smile_cascade.detectMultiScale(roi_gray, scaleFactor=1.8, minNeighbors=20)
         eyes = eye_cascade.detectMultiScale(roi_gray)
         
-        # 情绪判断逻辑
-        if len(smiles) > 3:
-            emotions.append("excited")
-        elif len(smiles) > 0:
-            emotions.append("happy")
-        elif len(eyes) > 0 and eyes[0][1] / h < 0.3:
-            emotions.append("sad")
+        # 扩展的情绪判断逻辑
+        eye_count = len(eyes)
+        smile_count = len(smiles)
+        
+        # 眼睛位置分析
+        eye_positions = [eye[1] for eye in eyes] if eye_count > 0 else []
+        avg_eye_position = sum(eye_positions)/len(eye_positions) if eye_positions else 0
+        
+        # 情绪判断
+        if smile_count > 3:
+            emotions.append("快乐")  # 感到愉快、满足和幸福
+        elif smile_count > 0:
+            if eye_count > 0 and avg_eye_position < h * 0.4:
+                emotions.append("快乐")
+            else:
+                emotions.append("惊讶")  # 对意外事件或情况感到意外和惊奇
+        elif eye_count > 1:
+            if avg_eye_position > h * 0.6:
+                emotions.append("悲伤")  # 由于失去、失望或其他不愉快经历而感到难过和沮丧
+            elif avg_eye_position < h * 0.3:
+                emotions.append("愤怒")  # 由于受到冒犯、不公正待遇或其他原因而感到恼火和不满
+            else:
+                emotions.append("恐惧")  # 对危险或潜在威胁感到害怕和不安
         else:
-            emotions.append("neutral")
+            emotions.append("厌恶")  # 对令人不快的事物感到反感和排斥
     
     return emotions
 
@@ -45,10 +61,13 @@ def process_frame(frame):
         emotions
     ):
         color = {
-            "happy": (0, 255, 0),      # 绿色
-            "excited": (0, 255, 255),  # 黄色
-            "sad": (0, 0, 255),        # 红色
-            "neutral": (255, 255, 0)   # 青色
+            "快乐": (0, 255, 0),      # 绿色
+            "悲伤": (0, 0, 255),      # 红色
+            "愤怒": (0, 0, 139),     # 深红色
+            "恐惧": (255, 0, 0),     # 蓝色
+            "厌恶": (139, 0, 139),   # 紫色
+            "惊讶": (255, 255, 0),   # 青色
+            "中性": (255, 255, 255)  # 白色
         }.get(emotion, (255, 255, 255))
         cv2.rectangle(marked_img, (x, y), (x+w, y+h), color, 2)
         cv2.putText(marked_img, emotion, (x, y-10),
@@ -94,8 +113,21 @@ def process_uploaded_file(uploaded_file):
         with col1:
             st.subheader("情绪统计")
             if emotion_count:
-                result_text = "，".join([f"{count}人{emotion}" for emotion, count in emotion_count.items()])
-                st.success(f"**检测结果**: {result_text}")
+                # 添加情绪说明
+                emotion_descriptions = {
+                    "快乐": "感到愉快、满足和幸福",
+                    "悲伤": "由于失去、失望或其他不愉快经历而感到难过和沮丧",
+                    "愤怒": "由于受到冒犯、不公正待遇或其他原因而感到恼火和不满",
+                    "恐惧": "对危险或潜在威胁感到害怕和不安",
+                    "厌恶": "对令人不快的事物感到反感和排斥",
+                    "惊讶": "对意外事件或情况感到意外和惊奇"
+                }
+                
+                result_text = "\n\n".join([
+                    f"**{emotion}**: {count}人\n{emotion_descriptions.get(emotion, '')}"
+                    for emotion, count in emotion_count.items()
+                ])
+                st.success(result_text)
             else:
                 st.warning("未检测到人脸")
         
