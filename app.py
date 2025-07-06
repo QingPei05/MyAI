@@ -85,13 +85,6 @@ def show_detection_guide():
     """Show detection guide in expandable section"""
     with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
         st.markdown("""
-        **Detection Logic Explained:**
-        
-        - 😊 **Happy**: Detected when smile is present
-        - 😠 **Angry**: Detected when eyes are wide open and positioned in upper face
-        - 😐 **Neutral**: Default state when no strong indicators found
-        - 😢 **Sad**: Detected when eyes are positioned higher than normal
-        
         **Tips for Better Results:**
         - Use clear, front-facing images
         - Ensure good lighting
@@ -136,11 +129,11 @@ def main():
                         result_parts.append(f"{count} {emo.capitalize()}")
                     
                     st.success(f"🎭 Detected {len(faces)} face(s): " + ", ".join(result_parts))
-                    
-                    # Show detection guide
-                    show_detection_guide()
                 else:
                     st.warning("No faces detected")
+                
+                # Always show detection guide (moved outside the if-else block)
+                show_detection_guide()
             
             with col2:
                 tab1, tab2 = st.tabs(["Original Image", "Analysis Result"])
