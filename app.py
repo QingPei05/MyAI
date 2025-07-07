@@ -112,14 +112,12 @@ TRANSLATIONS = {
 }
 T = TRANSLATIONS[lang]
 
-# ----------------- 初始化检测器 -----------------
 @st.cache_resource
 def get_detector():
     return EmotionDetector()
 
 detector = get_detector()
 
-# ----------------- 核心功能 -----------------
 def save_history(username, emotion, confidence, location="Unknown"):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     df = pd.DataFrame([[username, emotion, confidence, location, now]], 
@@ -135,14 +133,10 @@ def save_history(username, emotion, confidence, location="Unknown"):
 def show_detection_guide():
     with st.expander("ℹ️ How Emotion Detection Works", expanded=False):
         st.markdown("""
-        *Detection Logic Explained:*
-        - 😊 Happy: Smile present, cheeks raised
-        - 😠 Angry: Eyebrows lowered, eyes wide open
-        - 😐 Neutral: No strong facial movements
-        - 😢 Sad: Eyebrows raised, lip corners down
-        - 😲 Surprise: Eyebrows raised, mouth open
-        - 😨 Fear: Eyes tense, lips stretched
-        - 🤢 Disgust: Nose wrinkled, upper lip raised
+        *Detection Model:*
+        - Using DeepFace with hybrid CNN architecture
+        - 7 basic emotions: happy, sad, angry, neutral, surprise, fear, disgust
+        - Confidence score shown for each detection
         
         *Tips for Better Results:*
         - Use clear, front-facing images
@@ -150,44 +144,35 @@ def show_detection_guide():
         - Avoid obstructed faces
         """)
 
-# ----------------- 主程序 -----------------
 def main():
     st.title(f"👁‍🗨 {T['title']}")
     st.caption(T['upload_guide'])
     tabs = st.tabs([f"🏠 {T['nav_home']}", f"🗺️ {T['nav_location_map']}", f"📜 {T['nav_history']}", f"📊 {T['nav_emotion_chart']}"])
 
-    # 首页
     with tabs[0]:
         username = st.text_input(f"👤 {T['enter_username']}")
         if username:
             st.sidebar.success(f"👤 {T['welcome']} {username}")
             uploaded_file = st.file_uploader(T['upload_image'], type=["jpg","png"])
-            
             if uploaded_file:
                 try:
                     image = Image.open(uploaded_file)
                     img = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
-                    
-                    # 使用DeepFace检测情绪
                     detections = detector.detect_emotions(img)
                     detected_img = detector.draw_detections(img, detections)
-                    
                     col1, col2 = st.columns([1,2])
                     with col1:
                         st.subheader("🔍 Detection Results")
                         if detections:
                             emotions = [d["emotion"] for d in detections]
                             confidences = [d["confidence"] for d in detections]
-                            
                             st.success(f"🎭 Detected {len(detections)} face(s)")
                             for i, (emo, conf) in enumerate(zip(emotions, confidences)):
                                 st.write(f"- Face {i+1}: {emo} ({conf}%)")
-                            
                             show_detection_guide()
                             save_history(username, emotions[0], confidences[0], "Unknown")
                         else:
                             st.warning(T["no_faces"])
-                    
                     with col2:
                         t1, t2 = st.tabs([T["original_image"], T["processed_image"]])
                         with t1: 
@@ -195,15 +180,12 @@ def main():
                         with t2: 
                             st.image(detected_img, channels="BGR", use_container_width=True,
                                     caption=f"Detected {len(detections)} face(s)")
-                
                 except Exception as e:
                     st.error(f"{T['error_processing']}: {e}")
 
-    # 地图页 (保持不变)
     with tabs[1]:
         st.map(pd.DataFrame({'lat':[3.139+random.uniform(-0.01,0.01)], 'lon':[101.6869+random.uniform(-0.01,0.01)]}))
 
-    # 历史记录 (更新显示置信度)
     with tabs[2]:
         st.header(f"📜 {T['upload_history']}")
         if username:
@@ -213,9 +195,9 @@ def main():
                     if df.empty:
                         st.info(T['no_history'])
                     else:
-                        df_filtered = df[df["Username"].str.contains(username, case=False)] if username else df
+                        df_filtered = df[df["Username"].str.contains(username, case=False)]
                         df_filtered = df_filtered.sort_values("timestamp", ascending=False).reset_index(drop=True)
-                        df_filtered.index = df_filtered.index + 1  # 从1开始编号
+                        df_filtered.index = df_filtered.index + 1
                         st.dataframe(df_filtered)
                         st.caption(f"{len(df_filtered)} {T['records_shown']}")
                 else:
@@ -225,21 +207,24 @@ def main():
         else:
             st.warning(T['enter_username_history'])
 
-    # 图表 (保持不变)
     with tabs[3]:
         st.subheader(f"📊 {T['nav_emotion_chart']}")
-        try:
-            if os.path.exists("history.csv"):
-                df = pd.read_csv("history.csv")
-                if not df.empty:
-                    fig = px.pie(df, names="Emotion", title=T["nav_emotion_chart"])
-                    st.plotly_chart(fig)
+        if username:
+            try:
+                if os.path.exists("history.csv"):
+                    df = pd.read_csv("history.csv")
+                    df_filtered = df[df["Username"].str.contains(username, case=False)]
+                    if not df_filtered.empty:
+                        fig = px.pie(df_filtered, names="Emotion", title=f"{T['nav_emotion_chart']} ({username})")
+                        st.plotly_chart(fig)
+                    else:
+                        st.warning(T["no_history"])
                 else:
-                    st.warning(T["no_history"])
-            else:
-                st.warning(T["no_record_found"])
-        except Exception as e:
-            st.error(f"Chart error: {e}")
+                    st.warning(T["no_record_found"])
+            except Exception as e:
+                st.error(f"Chart error: {e}")
+        else:
+            st.warning(T['enter_username_history'])
 
 if __name__ == "__main__":
     main()
