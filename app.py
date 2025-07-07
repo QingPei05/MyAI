@@ -46,7 +46,7 @@ def show_detection_guide():
         - 😲 Surprise: Eyebrows raised, mouth open
         - 😨 Fear: Eyes tense, lips stretched
         - 🤢 Disgust: Nose wrinkled, upper lip raised
-        
+
         *Tips for Better Results:*
         - Use clear, front-facing images
         - Ensure good lighting
