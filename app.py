@@ -131,7 +131,7 @@ def show_user_history(username):
     with col1:
         st.subheader("📜 Your History")
     with col2:
-        if st.button("⬅ Back to Main"):
+        if st.button("⬅ Back to Main", key="back_button"):
             st.session_state.show_history = False
             st.rerun()
     
@@ -157,16 +157,77 @@ def show_user_history(username):
                     # Add index starting from 1
                     grouped.index = grouped.index + 1
                     
-                    # Display table on top, chart on bottom
-                    st.markdown("**Records**")
-                    st.dataframe(
-                        grouped[["Location", "Emotion", "timestamp"]].rename(columns={"timestamp": "Time"}),
+                    # Rename timestamp to Time for display
+                    grouped_display = grouped.rename(columns={"timestamp": "Time"})
+                    
+                    # Display table with checkboxes in last column
+                    st.markdown("**📝 Records**")
+                    
+                    # Initialize selection state if not exists
+                    if 'select_all_state' not in st.session_state:
+                        st.session_state.select_all_state = False
+                    
+                    # Add select column with current selection state
+                    grouped_display['Select'] = st.session_state.select_all_state
+                    
+                    # Display non-editable table with checkboxes
+                    edited_df = st.data_editor(
+                        grouped_display[["Location", "Emotion", "Time", "Select"]],
+                        disabled=["Location", "Emotion", "Time"],
+                        hide_index=True,
                         use_container_width=True
                     )
                     
-                    st.markdown("**Emotion Distribution**")
-                    fig = px.pie(user_df, names="Emotion", title="Your Emotion Distribution")
-                    st.plotly_chart(fig, use_container_width=True)
+                    # Add select all and delete buttons on the right
+                    col1, col2 = st.columns([4, 1])
+                    with col2:
+                        select_all = st.checkbox("Select All", key="select_all", value=st.session_state.select_all_state)
+                        if select_all != st.session_state.select_all_state:
+                            st.session_state.select_all_state = select_all
+                            st.rerun()
+                        
+                        if st.button("🗑️ Delete", key="delete_button"):
+                            # Get indices of selected rows
+                            selected_indices = edited_df.index[edited_df['Select']].tolist()
+                            if selected_indices:
+                                # Safely get the timestamps to delete
+                                try:
+                                    timestamps_to_delete = grouped.loc[selected_indices, "timestamp"].tolist()
+                                    # Filter out the deleted records
+                                    df = df[~((df["username"] == username) & (df["timestamp"].isin(timestamps_to_delete)))]
+                                    # Save back to CSV
+                                    df.to_csv("history.csv", index=False)
+                                    st.success("Selected records deleted successfully!")
+                                    st.session_state.select_all_state = False
+                                    st.rerun()
+                                except KeyError:
+                                    st.error("Error: Could not find selected records to delete")
+        
+                    # Add spacing between table and chart
+                    st.markdown("<br><br>", unsafe_allow_html=True)
+                    st.markdown("**📊 Emotion Distribution**")
+                    
+                    # Create columns for the selection and chart
+                    col_select, col_chart = st.columns([2, 5])
+                    
+                    with col_select:
+                        # Add record selection for chart
+                        records = grouped["timestamp"].tolist()
+                        records.insert(0, "All")  # Add "All" option
+                        selected_record = st.selectbox("Select record to view:", 
+                                                     ["All"] + [str(ts) for ts in grouped["timestamp"].tolist()], 
+                                                     index=0)
+
+                        # Filter data based on selection
+                        if selected_record == "All":
+                            chart_data = user_df
+                        else:
+                            chart_data = user_df[user_df["timestamp"] == selected_record]
+
+                    with col_chart:
+                        # Display chart with simplified title
+                        fig = px.pie(chart_data, names="Emotion")
+                        st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.info("No history records found for your account.")
             else:
@@ -180,36 +241,49 @@ def show_user_history(username):
 def login_page():
     st.title("👁‍🗨 Perspēct")
     st.subheader("🕵️‍♂️ Sign In")
-    username = st.text_input("Username", label_visibility="collapsed", placeholder="Username")
-    password = st.text_input("Password", type="password", label_visibility="collapsed", placeholder="Password")
     
-    # Buttons side by side
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Sign In"):
+    with st.form("login_form"):
+        username = st.text_input("Username", label_visibility="collapsed", placeholder="Username")
+        password = st.text_input("Password", type="password", label_visibility="collapsed", placeholder="Password")
+        
+        # Buttons side by side with Sign Up pushed to right
+        cols = st.columns([3, 1])  # 3:1 ratio for left vs right space
+        with cols[0]:
+            login_submitted = st.form_submit_button("Log In")
+        with cols[1]:
+            signup_clicked = st.form_submit_button("Sign Up →")
+        
+        if login_submitted:
             if authenticate(username, password):
                 st.session_state["logged_in"] = True
                 st.session_state["username"] = username
                 st.rerun()
             else:
                 st.error("Invalid username or password")
-    with col2:
-        if st.button("Sign Up"):
+        elif signup_clicked:
             st.session_state["show_signup"] = True
             st.rerun()
 
 def signup_page():
     st.title("👁‍🗨 Perspēct")
     st.subheader("🕵️‍♂️ Sign Up")
-    username = st.text_input("Choose a username", label_visibility="collapsed", placeholder="Username")
-    password = st.text_input("Choose a password", type="password", label_visibility="collapsed", placeholder="Password")
-    confirm_password = st.text_input("Confirm password", type="password", label_visibility="collapsed", placeholder="Confirm Password")
     
-    # Buttons side by side
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Register"):
-            if password != confirm_password:
+    with st.form("signup_form"):
+        username = st.text_input("Choose a username", label_visibility="collapsed", placeholder="Username")
+        password = st.text_input("Choose a password", type="password", label_visibility="collapsed", placeholder="Password")
+        confirm_password = st.text_input("Confirm password", type="password", label_visibility="collapsed", placeholder="Confirm Password")
+        
+        # Buttons side by side with Back pushed to right
+        cols = st.columns([3, 1])  # 3:1 ratio for left vs right space
+        with cols[0]:
+            register_submitted = st.form_submit_button("Register")
+        with cols[1]:
+            back_clicked = st.form_submit_button("← Back")
+        
+        if register_submitted:
+            if not username or not password or not confirm_password:
+                st.error("Username and password are required!")
+            elif password != confirm_password:
                 st.error("Passwords don't match")
             elif register_user(username, password):
                 st.success("Registration successful! Please sign in.")
@@ -217,8 +291,7 @@ def signup_page():
                 st.rerun()
             else:
                 st.error("Username already exists or registration failed")
-    with col2:
-        if st.button("Back to Sign In"):
+        elif back_clicked:
             st.session_state["show_signup"] = False
             st.rerun()
 
@@ -273,9 +346,9 @@ def main_app():
                     with col2:
                         t1, t2 = st.tabs(["Original Image", "Processed Image"])
                         with t1:
-                            st.image(image, use_column_width=True)
+                            st.image(image, use_container_width=True)
                         with t2:
-                            st.image(detected_img, channels="BGR", use_column_width=True,
+                            st.image(detected_img, channels="BGR", use_container_width=True,
                                     caption=f"Detected {len(detections)} {face_word}")
                 except Exception as e:
                     st.error(f"Error while processing the image: {e}")
